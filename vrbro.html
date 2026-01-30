@@ -1,0 +1,2122 @@
+<!--
+================================================================================
+VR CRICKET BATTING GAME - Meta Quest 2 Edition
+================================================================================
+
+HOW TO PLAY ON QUEST 2:
+1. Download this HTML file to your Quest 2 or host it on a web server
+2. Open the file in the Quest 2 browser (Oculus Browser)
+3. Click the VR goggles icon in the bottom right to enter VR mode
+4. Use your RIGHT controller as the cricket bat - swing to hit!
+5. Use your LEFT controller thumbstick/trigger for menu navigation
+
+CONTROLS:
+- Right Controller: Cricket bat (swing to hit the ball)
+- Left Trigger: Select menu options / Ready for next ball
+- Right Grip: Pause game
+- Left Grip: Reset position
+
+GAME MODES:
+- Practice: Unlimited balls, no wickets
+- Challenge: Limited overs, score as much as possible
+- Survival: Keep batting until you're out
+- Target Chase: Reach the target score within given balls
+
+DIFFICULTY:
+- Easy: Slower balls, less variation
+- Medium: Moderate speed and variation
+- Hard: Fast balls, high variation, aggressive fielding
+
+Enjoy the game! 🏏
+================================================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VR Cricket - Quest 2 Edition</title>
+    
+    <!-- A-Frame Core -->
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            background: linear-gradient(135deg, #1a472a 0%, #2d5a3d 100%);
+        }
+        
+        /* Main Menu Overlay */
+        #menu-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(26, 71, 42, 0.95) 0%, rgba(45, 90, 61, 0.95) 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            color: white;
+        }
+        
+        #menu-overlay.hidden {
+            display: none;
+        }
+        
+        .menu-title {
+            font-size: 3rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        .menu-subtitle {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.8;
+        }
+        
+        .menu-section {
+            margin: 1rem 0;
+            text-align: center;
+        }
+        
+        .menu-section h3 {
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .menu-btn {
+            padding: 12px 24px;
+            font-size: 1rem;
+            border: 2px solid white;
+            background: transparent;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+            min-width: 120px;
+        }
+        
+        .menu-btn:hover, .menu-btn.active {
+            background: white;
+            color: #1a472a;
+        }
+        
+        .menu-btn.primary {
+            background: #ffd700;
+            border-color: #ffd700;
+            color: #1a472a;
+            font-weight: bold;
+            font-size: 1.2rem;
+            padding: 15px 40px;
+        }
+        
+        .menu-btn.primary:hover {
+            background: #ffed4a;
+            transform: scale(1.05);
+        }
+        
+        .instructions {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            max-width: 500px;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+        
+        .instructions h4 {
+            margin-bottom: 0.5rem;
+        }
+        
+        /* In-Game HUD */
+        #game-hud {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            z-index: 100;
+            min-width: 200px;
+        }
+        
+        #game-hud.hidden {
+            display: none;
+        }
+        
+        .hud-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+        
+        .hud-label {
+            opacity: 0.7;
+        }
+        
+        .hud-value {
+            font-weight: bold;
+        }
+        
+        .hud-score {
+            font-size: 2rem;
+            text-align: center;
+            border-bottom: 1px solid rgba(255,255,255,0.3);
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+        
+        /* Shot Feedback */
+        #shot-feedback {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            z-index: 200;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        #shot-feedback.show {
+            opacity: 1;
+        }
+        
+        #shot-feedback.four {
+            color: #4CAF50;
+        }
+        
+        #shot-feedback.six {
+            color: #FFD700;
+        }
+        
+        #shot-feedback.out {
+            color: #f44336;
+        }
+        
+        #shot-feedback.runs {
+            color: #2196F3;
+        }
+        
+        /* Pause Menu */
+        #pause-menu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 500;
+            color: white;
+        }
+        
+        #pause-menu.hidden {
+            display: none;
+        }
+        
+        #pause-menu h2 {
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        /* Game Over Screen */
+        #game-over {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 600;
+            color: white;
+        }
+        
+        #game-over.hidden {
+            display: none;
+        }
+        
+        #game-over h2 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin: 1.5rem 0;
+            min-width: 300px;
+        }
+        
+        .stat-box {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+        
+        /* VR Button styling */
+        .a-enter-vr-button {
+            background: #ffd700 !important;
+            color: #1a472a !important;
+            font-weight: bold !important;
+        }
+    </style>
+</head>
+<body>
+    <!-- Main Menu -->
+    <div id="menu-overlay">
+        <div class="menu-title">🏏 VR CRICKET</div>
+        <div class="menu-subtitle">Meta Quest 2 Edition</div>
+        
+        <div class="menu-section">
+            <h3>Game Mode</h3>
+            <div class="btn-group">
+                <button class="menu-btn active" data-mode="practice">Practice</button>
+                <button class="menu-btn" data-mode="challenge">Challenge</button>
+                <button class="menu-btn" data-mode="survival">Survival</button>
+                <button class="menu-btn" data-mode="target">Target Chase</button>
+            </div>
+        </div>
+        
+        <div class="menu-section">
+            <h3>Difficulty</h3>
+            <div class="btn-group">
+                <button class="menu-btn" data-difficulty="easy">Easy</button>
+                <button class="menu-btn active" data-difficulty="medium">Medium</button>
+                <button class="menu-btn" data-difficulty="hard">Hard</button>
+            </div>
+        </div>
+        
+        <div class="menu-section">
+            <h3>Overs (Challenge/Target Mode)</h3>
+            <div class="btn-group">
+                <button class="menu-btn active" data-overs="1">1 Over</button>
+                <button class="menu-btn" data-overs="2">2 Overs</button>
+                <button class="menu-btn" data-overs="4">4 Overs</button>
+            </div>
+        </div>
+        
+        <div class="menu-section" style="margin-top: 2rem;">
+            <button class="menu-btn primary" id="start-btn">▶ START GAME</button>
+        </div>
+        
+        <div class="instructions">
+            <h4>🎮 Controls:</h4>
+            <p>• <strong>Right Controller</strong> - Cricket bat (swing to hit)</p>
+            <p>• <strong>Left Trigger</strong> - Ready for next ball</p>
+            <p>• <strong>Right Grip</strong> - Pause game</p>
+            <p>• <strong>Left Grip</strong> - Reset position</p>
+            <p style="margin-top: 10px; opacity: 0.7;">Click the VR button to enter immersive mode!</p>
+        </div>
+    </div>
+    
+    <!-- In-Game HUD -->
+    <div id="game-hud" class="hidden">
+        <div class="hud-score">
+            <span id="hud-runs">0</span>/<span id="hud-wickets">0</span>
+        </div>
+        <div class="hud-row">
+            <span class="hud-label">Balls:</span>
+            <span class="hud-value" id="hud-balls">0</span>
+        </div>
+        <div class="hud-row">
+            <span class="hud-label">Fours:</span>
+            <span class="hud-value" id="hud-fours">0</span>
+        </div>
+        <div class="hud-row">
+            <span class="hud-label">Sixes:</span>
+            <span class="hud-value" id="hud-sixes">0</span>
+        </div>
+        <div class="hud-row">
+            <span class="hud-label">Strike Rate:</span>
+            <span class="hud-value" id="hud-sr">0.00</span>
+        </div>
+        <div class="hud-row">
+            <span class="hud-label">Last Shot:</span>
+            <span class="hud-value" id="hud-shot">-</span>
+        </div>
+        <div class="hud-row" id="hud-target-row" style="display: none;">
+            <span class="hud-label">Target:</span>
+            <span class="hud-value" id="hud-target">0</span>
+        </div>
+    </div>
+    
+    <!-- Shot Feedback -->
+    <div id="shot-feedback"></div>
+    
+    <!-- Pause Menu -->
+    <div id="pause-menu" class="hidden">
+        <h2>⏸ PAUSED</h2>
+        <div class="btn-group" style="flex-direction: column;">
+            <button class="menu-btn" id="resume-btn">▶ Resume</button>
+            <button class="menu-btn" id="restart-btn">🔄 Restart</button>
+            <button class="menu-btn" id="quit-btn">🏠 Main Menu</button>
+        </div>
+    </div>
+    
+    <!-- Game Over Screen -->
+    <div id="game-over" class="hidden">
+        <h2 id="game-over-title">INNINGS OVER</h2>
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="stat-value" id="final-score">0</div>
+                <div class="stat-label">Runs Scored</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="final-balls">0</div>
+                <div class="stat-label">Balls Faced</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="final-fours">0</div>
+                <div class="stat-label">Fours</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="final-sixes">0</div>
+                <div class="stat-label">Sixes</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="final-sr">0.00</div>
+                <div class="stat-label">Strike Rate</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" id="final-best">-</div>
+                <div class="stat-label">Best Shot</div>
+            </div>
+        </div>
+        <div class="btn-group" style="margin-top: 1rem;">
+            <button class="menu-btn primary" id="play-again-btn">🏏 Play Again</button>
+            <button class="menu-btn" id="menu-btn">🏠 Main Menu</button>
+        </div>
+    </div>
+    
+    <!-- A-Frame Scene -->
+    <a-scene 
+        id="cricket-scene"
+        vr-mode-ui="enabled: true"
+        renderer="antialias: true; colorManagement: true;"
+        loading-screen="dotsColor: #ffd700; backgroundColor: #1a472a">
+        
+        <!-- Assets -->
+        <a-assets>
+            <!-- Sounds -->
+            <audio id="bat-hit-sound" src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=" preload="auto"></audio>
+        </a-assets>
+        
+        <!-- Sky and Environment -->
+        <a-sky color="#87CEEB" id="sky"></a-sky>
+        
+        <!-- Sun -->
+        <a-entity 
+            light="type: directional; color: #FFF; intensity: 1.2; castShadow: true"
+            position="50 100 50">
+        </a-entity>
+        
+        <!-- Ambient Light -->
+        <a-entity light="type: ambient; color: #BBB; intensity: 0.5"></a-entity>
+        
+        <!-- Stadium/Environment -->
+        <a-entity id="stadium">
+            <!-- Main Ground (Grass) -->
+            <a-cylinder 
+                id="ground"
+                position="0 -0.1 -11" 
+                radius="80" 
+                height="0.2" 
+                color="#228B22"
+                segments-radial="64">
+            </a-cylinder>
+            
+            <!-- Pitch (Brown Strip) -->
+            <a-box 
+                id="pitch"
+                position="0 0.01 -11" 
+                width="3" 
+                height="0.05" 
+                depth="22" 
+                color="#C4A35A">
+            </a-box>
+            
+            <!-- Pitch Crease Lines -->
+            <a-box position="0 0.02 0" width="2.5" height="0.02" depth="0.05" color="white"></a-box>
+            <a-box position="0 0.02 -22" width="2.5" height="0.02" depth="0.05" color="white"></a-box>
+            
+            <!-- Boundary Rope -->
+            <a-torus 
+                id="boundary"
+                position="0 0.1 -11" 
+                radius="70" 
+                radius-tubular="0.15" 
+                color="#FFFFFF"
+                rotation="90 0 0"
+                segments-tubular="100">
+            </a-torus>
+            
+            <!-- Boundary Markers (Flags) -->
+            <a-entity id="boundary-markers"></a-entity>
+        </a-entity>
+        
+        <!-- Stumps - Batsman End -->
+        <a-entity id="batsman-stumps" position="0 0 0.5">
+            <!-- Three Stumps -->
+            <a-cylinder position="-0.115 0.35 0" radius="0.015" height="0.71" color="#F5DEB3"></a-cylinder>
+            <a-cylinder position="0 0.35 0" radius="0.015" height="0.71" color="#F5DEB3"></a-cylinder>
+            <a-cylinder position="0.115 0.35 0" radius="0.015" height="0.71" color="#F5DEB3"></a-cylinder>
+            <!-- Bails -->
+            <a-box id="bail-1" position="-0.0575 0.72 0" width="0.08" height="0.02" depth="0.015" color="#F5DEB3"></a-box>
+            <a-box id="bail-2" position="0.0575 0.72 0" width="0.08" height="0.02" depth="0.015" color="#F5DEB3"></a-box>
+        </a-entity>
+        
+        <!-- Stumps - Bowler End -->
+        <a-entity id="bowler-stumps" position="0 0 -22">
+            <a-cylinder position="-0.115 0.35 0" radius="0.015" height="0.71" color="#F5DEB3"></a-cylinder>
+            <a-cylinder position="0 0.35 0" radius="0.015" height="0.71" color="#F5DEB3"></a-cylinder>
+            <a-cylinder position="0.115 0.35 0" radius="0.015" height="0.71" color="#F5DEB3"></a-cylinder>
+            <a-box position="-0.0575 0.72 0" width="0.08" height="0.02" depth="0.015" color="#F5DEB3"></a-box>
+            <a-box position="0.0575 0.72 0" width="0.08" height="0.02" depth="0.015" color="#F5DEB3"></a-box>
+        </a-entity>
+        
+        <!-- Bowler Character -->
+        <a-entity id="bowler" position="0 0 -25">
+            <!-- Body -->
+            <a-cylinder position="0 0.9 0" radius="0.25" height="0.8" color="#FFFFFF"></a-cylinder>
+            <!-- Head -->
+            <a-sphere position="0 1.5 0" radius="0.2" color="#DEB887"></a-sphere>
+            <!-- Arms -->
+            <a-cylinder id="bowler-arm-right" position="0.35 1.1 0" radius="0.08" height="0.6" color="#DEB887" rotation="0 0 -30"></a-cylinder>
+            <a-cylinder id="bowler-arm-left" position="-0.35 1.1 0" radius="0.08" height="0.6" color="#DEB887" rotation="0 0 30"></a-cylinder>
+            <!-- Legs -->
+            <a-cylinder position="0.15 0.3 0" radius="0.1" height="0.6" color="#FFFFFF"></a-cylinder>
+            <a-cylinder position="-0.15 0.3 0" radius="0.1" height="0.6" color="#FFFFFF"></a-cylinder>
+        </a-entity>
+        
+        <!-- Cricket Ball -->
+        <a-sphere 
+            id="cricket-ball"
+            position="0 1.5 -24"
+            radius="0.15"
+            color="#FF0000"
+            visible="false"
+            material="shader: flat; emissive: #FF0000; emissiveIntensity: 0.5"
+            shadow="receive: false">
+            <!-- Ball seam -->
+            <a-torus position="0 0 0" radius="0.15" radius-tubular="0.01" color="#FFFFFF" rotation="0 0 0"></a-torus>
+        </a-sphere>
+        
+        <!-- Ball Trail -->
+        <a-entity id="ball-trail"></a-entity>
+        
+        <!-- Fielders -->
+        <a-entity id="fielders">
+            <!-- Slip Fielder -->
+            <a-entity class="fielder" id="fielder-slip" position="3 0 2">
+                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
+                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            </a-entity>
+            
+            <!-- Point Fielder -->
+            <a-entity class="fielder" id="fielder-point" position="12 0 -5">
+                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
+                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            </a-entity>
+            
+            <!-- Cover Fielder -->
+            <a-entity class="fielder" id="fielder-cover" position="15 0 -15">
+                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
+                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            </a-entity>
+            
+            <!-- Mid-off Fielder -->
+            <a-entity class="fielder" id="fielder-midoff" position="8 0 -25">
+                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
+                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            </a-entity>
+            
+            <!-- Mid-on Fielder -->
+            <a-entity class="fielder" id="fielder-midon" position="-8 0 -25">
+                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
+                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            </a-entity>
+            
+            <!-- Square Leg Fielder -->
+            <a-entity class="fielder" id="fielder-squareleg" position="-12 0 -5">
+                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
+                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            </a-entity>
+            
+            <!-- Fine Leg Fielder -->
+            <a-entity class="fielder" id="fielder-fineleg" position="-8 0 10">
+                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
+                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            </a-entity>
+            
+            <!-- Third Man Fielder -->
+            <a-entity class="fielder" id="fielder-thirdman" position="8 0 10">
+                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
+                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            </a-entity>
+            
+            <!-- Long-off Boundary -->
+            <a-entity class="fielder" id="fielder-longoff" position="20 0 -50">
+                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
+                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            </a-entity>
+            
+            <!-- Long-on Boundary -->
+            <a-entity class="fielder" id="fielder-longon" position="-20 0 -50">
+                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
+                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            </a-entity>
+            
+            <!-- Wicket Keeper -->
+            <a-entity class="fielder" id="wicket-keeper" position="0 0 2">
+                <a-cylinder position="0 0.5 0" radius="0.2" height="0.8" color="#FFFFFF"></a-cylinder>
+                <a-sphere position="0 1.1 0" radius="0.15" color="#DEB887"></a-sphere>
+                <!-- Gloves -->
+                <a-sphere position="0.3 0.7 -0.2" radius="0.1" color="#8B4513"></a-sphere>
+                <a-sphere position="-0.3 0.7 -0.2" radius="0.1" color="#8B4513"></a-sphere>
+            </a-entity>
+        </a-entity>
+        
+        <!-- VR Camera Rig -->
+        <a-entity id="rig" position="0 0 0">
+            <a-camera id="camera" position="0 1.6 0" wasd-controls-enabled="false"></a-camera>
+            
+            <!-- Left Hand Controller (Menu) -->
+            <a-entity 
+                id="left-hand"
+                oculus-touch-controls="hand: left"
+                laser-controls="hand: left">
+            </a-entity>
+            
+            <!-- Right Hand Controller (Bat) -->
+            <a-entity 
+                id="right-hand"
+                oculus-touch-controls="hand: right">
+                
+                <!-- Cricket Bat Model -->
+                <a-entity id="cricket-bat" rotation="-90 0 0" position="0 0 -0.1">
+                    <!-- Bat Handle -->
+                    <a-cylinder 
+                        position="0 0.15 0" 
+                        radius="0.02" 
+                        height="0.35" 
+                        color="#8B4513">
+                    </a-cylinder>
+                    
+                    <!-- Bat Handle Grip -->
+                    <a-cylinder 
+                        position="0 0.05 0" 
+                        radius="0.022" 
+                        height="0.15" 
+                        color="#2F4F4F">
+                    </a-cylinder>
+                    
+                    <!-- Bat Blade -->
+                    <a-box 
+                        id="bat-blade"
+                        position="0 0.55 0" 
+                        width="0.11" 
+                        height="0.5" 
+                        depth="0.04" 
+                        color="#F5DEB3">
+                    </a-box>
+                    
+                    <!-- Bat Edge (Left) -->
+                    <a-box 
+                        position="-0.055 0.55 0" 
+                        width="0.01" 
+                        height="0.5" 
+                        depth="0.05" 
+                        color="#DEB887">
+                    </a-box>
+                    
+                    <!-- Bat Edge (Right) -->
+                    <a-box 
+                        position="0.055 0.55 0" 
+                        width="0.01" 
+                        height="0.5" 
+                        depth="0.05" 
+                        color="#DEB887">
+                    </a-box>
+                    
+                    <!-- Bat Toe -->
+                    <a-box 
+                        position="0 0.82 0" 
+                        width="0.11" 
+                        height="0.04" 
+                        depth="0.04" 
+                        color="#DEB887"
+                        rotation="0 0 0">
+                    </a-box>
+                    
+                    <!-- Sweet Spot Marker (Visual Guide) -->
+                    <a-box 
+                        id="sweet-spot"
+                        position="0 0.5 0.025" 
+                        width="0.06" 
+                        height="0.15" 
+                        depth="0.001" 
+                        color="#FFD700"
+                        opacity="0.3">
+                    </a-box>
+                </a-entity>
+            </a-entity>
+        </a-entity>
+        
+        <!-- In-VR Score Display -->
+        <a-entity id="vr-hud" position="0 2.5 -3" look-at="[camera]">
+            <a-plane 
+                position="0 0 0" 
+                width="2" 
+                height="0.8" 
+                color="#000000" 
+                opacity="0.7"
+                visible="false"
+                id="vr-scoreboard">
+            </a-plane>
+            <a-text 
+                id="vr-score-text"
+                value="0/0"
+                align="center"
+                position="0 0.15 0.01"
+                scale="1.5 1.5 1.5"
+                color="#FFFFFF"
+                visible="false">
+            </a-text>
+            <a-text 
+                id="vr-balls-text"
+                value="Balls: 0"
+                align="center"
+                position="0 -0.1 0.01"
+                scale="0.7 0.7 0.7"
+                color="#CCCCCC"
+                visible="false">
+            </a-text>
+            <a-text 
+                id="vr-shot-text"
+                value=""
+                align="center"
+                position="0 -0.25 0.01"
+                scale="0.5 0.5 0.5"
+                color="#FFD700"
+                visible="false">
+            </a-text>
+        </a-entity>
+        
+        <!-- Hit Effect Particles -->
+        <a-entity id="hit-particles" position="0 1 0" visible="false">
+            <a-sphere radius="0.05" color="#FFD700" opacity="0.8"></a-sphere>
+        </a-entity>
+        
+    </a-scene>
+
+    <script>
+    // ============================================================================
+    // VR CRICKET GAME - Main Game Logic
+    // ============================================================================
+    
+    (function() {
+        'use strict';
+        
+        // ========================================================================
+        // GAME CONFIGURATION
+        // ========================================================================
+        
+        const CONFIG = {
+            // Pitch dimensions (in meters, approximating real cricket)
+            pitchLength: 22, // Standard pitch length
+            boundaryDistance: 70, // Distance to boundary
+            
+            // Ball physics
+            ballRadius: 0.036, // Cricket ball radius (~7.2cm diameter)
+            gravity: -9.8,
+            airResistance: 0.98,
+            groundFriction: 0.7,
+            bounceCoefficient: 0.6,
+            
+            // Speed settings (meters per second)
+            speeds: {
+                easy: { min: 8, max: 12 },     // Slower for easier hitting
+                medium: { min: 12, max: 18 },  // Medium pace
+                hard: { min: 18, max: 25 }     // Fast but still hittable
+            },
+            
+            // Bat properties
+            batLength: 0.85,
+            batWidth: 0.11,
+            sweetSpotSize: 0.15,
+            edgeWidth: 0.02,
+            
+            // Timing windows (in seconds)
+            timing: {
+                perfect: 0.05,
+                good: 0.1,
+                fair: 0.15
+            },
+            
+            // Scoring
+            boundaryFour: 4,
+            boundarySix: 6,
+            
+            // Game settings
+            ballsPerOver: 6,
+            wicketsPerInnings: 1 // Single wicket for simplicity
+        };
+        
+        // ========================================================================
+        // GAME STATE
+        // ========================================================================
+        
+        const GameState = {
+            // Game settings
+            mode: 'practice', // practice, challenge, survival, target
+            difficulty: 'medium',
+            totalOvers: 1,
+            targetScore: 0,
+            
+            // Current game state
+            isPlaying: false,
+            isPaused: false,
+            isGameOver: false,
+            isBallInPlay: false,
+            isReadyForBall: false,
+            
+            // Score tracking
+            runs: 0,
+            wickets: 0,
+            ballsFaced: 0,
+            fours: 0,
+            sixes: 0,
+            dotBalls: 0,
+            bestShot: '',
+            highScore: localStorage.getItem('cricketHighScore') || 0,
+            
+            // Ball state
+            ballPosition: { x: 0, y: 1.5, z: -24 },
+            ballVelocity: { x: 0, y: 0, z: 0 },
+            ballSpin: { x: 0, y: 0, z: 0 },
+            ballHasBouncedOnPitch: false,
+            ballHitByBat: false,
+            
+            // Bat tracking
+            batPosition: { x: 0, y: 1, z: 0 },
+            batPrevPosition: { x: 0, y: 1, z: 0 },
+            batVelocity: { x: 0, y: 0, z: 0 },
+            batRotation: { x: 0, y: 0, z: 0 },
+            
+            // Delivery info
+            currentDeliveryType: 'good-length',
+            currentLine: 'middle',
+            
+            // Reset game state
+            reset: function() {
+                this.runs = 0;
+                this.wickets = 0;
+                this.ballsFaced = 0;
+                this.fours = 0;
+                this.sixes = 0;
+                this.dotBalls = 0;
+                this.bestShot = '';
+                this.isPlaying = true;
+                this.isPaused = false;
+                this.isGameOver = false;
+                this.isBallInPlay = false;
+                this.isReadyForBall = true;
+                this.ballHasBouncedOnPitch = false;
+                this.ballHitByBat = false;
+            },
+            
+            // Calculate strike rate
+            getStrikeRate: function() {
+                if (this.ballsFaced === 0) return 0;
+                return ((this.runs / this.ballsFaced) * 100).toFixed(2);
+            },
+            
+            // Get remaining balls
+            getRemainingBalls: function() {
+                if (this.mode === 'practice') return '∞';
+                return (this.totalOvers * CONFIG.ballsPerOver) - this.ballsFaced;
+            },
+            
+            // Check if innings should end
+            checkInningsEnd: function() {
+                if (this.mode === 'practice') return false;
+                
+                if (this.mode === 'survival' && this.wickets >= 1) return true;
+                if (this.mode === 'challenge' && this.ballsFaced >= this.totalOvers * CONFIG.ballsPerOver) return true;
+                if (this.mode === 'target') {
+                    if (this.runs >= this.targetScore) return true;
+                    if (this.ballsFaced >= this.totalOvers * CONFIG.ballsPerOver) return true;
+                    if (this.wickets >= 1) return true;
+                }
+                
+                return false;
+            }
+        };
+        
+        // ========================================================================
+        // AUDIO SYSTEM
+        // ========================================================================
+        
+        const AudioSystem = {
+            context: null,
+            
+            init: function() {
+                try {
+                    this.context = new (window.AudioContext || window.webkitAudioContext)();
+                } catch (e) {
+                    console.warn('Web Audio API not supported');
+                }
+            },
+            
+            // Generate a bat hit sound
+            playBatHit: function(quality) {
+                if (!this.context) return;
+                
+                const oscillator = this.context.createOscillator();
+                const gainNode = this.context.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(this.context.destination);
+                
+                // Different sounds based on quality
+                if (quality === 'perfect') {
+                    oscillator.frequency.setValueAtTime(800, this.context.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(200, this.context.currentTime + 0.1);
+                    gainNode.gain.setValueAtTime(0.5, this.context.currentTime);
+                } else if (quality === 'edge') {
+                    oscillator.frequency.setValueAtTime(1200, this.context.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(400, this.context.currentTime + 0.05);
+                    gainNode.gain.setValueAtTime(0.3, this.context.currentTime);
+                } else {
+                    oscillator.frequency.setValueAtTime(600, this.context.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(150, this.context.currentTime + 0.08);
+                    gainNode.gain.setValueAtTime(0.4, this.context.currentTime);
+                }
+                
+                gainNode.gain.exponentialRampToValueAtTime(0.01, this.context.currentTime + 0.15);
+                
+                oscillator.start(this.context.currentTime);
+                oscillator.stop(this.context.currentTime + 0.15);
+            },
+            
+            // Ball hitting stumps
+            playStumpsHit: function() {
+                if (!this.context) return;
+                
+                const oscillator = this.context.createOscillator();
+                const gainNode = this.context.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(this.context.destination);
+                
+                oscillator.frequency.setValueAtTime(150, this.context.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(50, this.context.currentTime + 0.3);
+                gainNode.gain.setValueAtTime(0.6, this.context.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, this.context.currentTime + 0.3);
+                
+                oscillator.start(this.context.currentTime);
+                oscillator.stop(this.context.currentTime + 0.3);
+            },
+            
+            // Crowd cheer
+            playCrowdCheer: function(intensity) {
+                if (!this.context) return;
+                
+                // Create noise for crowd
+                const bufferSize = this.context.sampleRate * 0.5;
+                const buffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
+                const data = buffer.getChannelData(0);
+                
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * 0.3;
+                }
+                
+                const noise = this.context.createBufferSource();
+                noise.buffer = buffer;
+                
+                const filter = this.context.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(intensity === 'six' ? 2000 : 1000, this.context.currentTime);
+                
+                const gainNode = this.context.createGain();
+                gainNode.gain.setValueAtTime(intensity === 'six' ? 0.4 : 0.2, this.context.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, this.context.currentTime + 1);
+                
+                noise.connect(filter);
+                filter.connect(gainNode);
+                gainNode.connect(this.context.destination);
+                
+                noise.start(this.context.currentTime);
+                noise.stop(this.context.currentTime + 1);
+            },
+            
+            // Ball bounce
+            playBounce: function() {
+                if (!this.context) return;
+                
+                const oscillator = this.context.createOscillator();
+                const gainNode = this.context.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(this.context.destination);
+                
+                oscillator.frequency.setValueAtTime(300, this.context.currentTime);
+                oscillator.frequency.exponentialRampToValueAtTime(100, this.context.currentTime + 0.05);
+                gainNode.gain.setValueAtTime(0.2, this.context.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, this.context.currentTime + 0.05);
+                
+                oscillator.start(this.context.currentTime);
+                oscillator.stop(this.context.currentTime + 0.05);
+            }
+        };
+        
+        // ========================================================================
+        // BOWLING SYSTEM
+        // ========================================================================
+        
+        const BowlingSystem = {
+            // Generate a random delivery
+            generateDelivery: function() {
+                const difficulty = GameState.difficulty;
+                const speedRange = CONFIG.speeds[difficulty];
+                
+                // Random speed within range
+                const speed = speedRange.min + Math.random() * (speedRange.max - speedRange.min);
+                
+                // Delivery type selection based on difficulty
+                const deliveryTypes = this.getDeliveryTypes(difficulty);
+                const deliveryType = deliveryTypes[Math.floor(Math.random() * deliveryTypes.length)];
+                
+                // Line variation
+                const lines = ['off', 'middle', 'leg'];
+                const lineWeights = difficulty === 'hard' ? [0.4, 0.4, 0.2] : [0.33, 0.34, 0.33];
+                const line = this.weightedRandom(lines, lineWeights);
+                
+                GameState.currentDeliveryType = deliveryType;
+                GameState.currentLine = line;
+                
+                return {
+                    speed: speed,
+                    type: deliveryType,
+                    line: line,
+                    ...this.getDeliveryParams(deliveryType, line, speed)
+                };
+            },
+            
+            getDeliveryTypes: function(difficulty) {
+                if (difficulty === 'easy') {
+                    return ['good-length', 'full-toss', 'good-length', 'half-volley'];
+                } else if (difficulty === 'medium') {
+                    return ['good-length', 'full-toss', 'bouncer', 'yorker', 'half-volley'];
+                } else {
+                    return ['good-length', 'bouncer', 'yorker', 'good-length', 'bouncer', 'yorker'];
+                }
+            },
+            
+            weightedRandom: function(items, weights) {
+                const totalWeight = weights.reduce((a, b) => a + b, 0);
+                let random = Math.random() * totalWeight;
+                
+                for (let i = 0; i < items.length; i++) {
+                    random -= weights[i];
+                    if (random <= 0) return items[i];
+                }
+                return items[items.length - 1];
+            },
+            
+            getDeliveryParams: function(type, line, speed) {
+                // Starting position (at bowler's hand)
+                let startPos = { x: 0, y: 2, z: -24 };
+                
+                // Target position (batsman crease)
+                let targetZ = 1; // Come right to the batsman
+                let targetY = 1.2; // Chest height
+                
+                // Line adjustments
+                let lineOffset = 0;
+                if (line === 'off') lineOffset = 0.3;
+                else if (line === 'leg') lineOffset = -0.3;
+                
+                // Type adjustments - make all balls easier to hit
+                switch (type) {
+                    case 'full-toss':
+                        targetZ = 1;
+                        targetY = 1.2;
+                        break;
+                    case 'yorker':
+                        targetZ = 0.8;
+                        targetY = 0.8;
+                        break;
+                    case 'bouncer':
+                        targetZ = 0;
+                        targetY = 1.6;
+                        break;
+                    case 'half-volley':
+                        targetZ = 1;
+                        targetY = 1.0;
+                        break;
+                    case 'good-length':
+                    default:
+                        targetZ = 1;
+                        targetY = 1.2;
+                        break;
+                }
+                
+                const targetX = lineOffset;
+                
+                // Simple direct trajectory - calculate time based on distance
+                const distance = Math.abs(targetZ - startPos.z);
+                const flightTime = distance / (speed * 0.5); // Slower for easier hitting
+                
+                // Calculate velocities for straight trajectory
+                const vx = (targetX - startPos.x) / flightTime;
+                const vz = (targetZ - startPos.z) / flightTime;
+                
+                // Calculate vy to reach target height
+                const vy = (targetY - startPos.y - 0.5 * CONFIG.gravity * flightTime * flightTime) / flightTime;
+                
+                return {
+                    startPos: startPos,
+                    velocity: { x: vx, y: vy, z: vz },
+                    bounceZ: -10, // Bounce earlier
+                    targetY: targetY,
+                    flightTime: flightTime
+                };
+            }
+        };
+        
+        // ========================================================================
+        // PHYSICS SYSTEM
+        // ========================================================================
+        
+        const PhysicsSystem = {
+            // Update ball position based on physics
+            updateBall: function(deltaTime) {
+                if (!GameState.isBallInPlay) return;
+                
+                const ball = GameState.ballPosition;
+                const vel = GameState.ballVelocity;
+                
+                // Apply gravity
+                vel.y += CONFIG.gravity * deltaTime;
+                
+                // Apply air resistance
+                vel.x *= CONFIG.airResistance;
+                vel.z *= CONFIG.airResistance;
+                
+                // Update position
+                ball.x += vel.x * deltaTime;
+                ball.y += vel.y * deltaTime;
+                ball.z += vel.z * deltaTime;
+                
+                // Ground collision
+                if (ball.y <= CONFIG.ballRadius) {
+                    ball.y = CONFIG.ballRadius;
+                    vel.y = -vel.y * CONFIG.bounceCoefficient;
+                    vel.x *= CONFIG.groundFriction;
+                    vel.z *= CONFIG.groundFriction;
+                    
+                    // Check if this is the pitch bounce
+                    if (!GameState.ballHasBouncedOnPitch && ball.z > -15 && ball.z < 2) {
+                        GameState.ballHasBouncedOnPitch = true;
+                        AudioSystem.playBounce();
+                    }
+                    
+                    // Ball has stopped
+                    if (Math.abs(vel.y) < 0.1 && Math.abs(vel.x) < 0.1 && Math.abs(vel.z) < 0.1) {
+                        this.ballStopped();
+                    }
+                }
+                
+                // Check boundaries and scoring
+                this.checkBoundary();
+                this.checkStumps();
+                this.checkFielderCatch();
+                
+                // Update ball entity position
+                const ballEntity = document.getElementById('cricket-ball');
+                if (ballEntity) {
+                    ballEntity.setAttribute('position', `${ball.x} ${ball.y} ${ball.z}`);
+                }
+                
+                // Update ball trail
+                this.updateBallTrail();
+            },
+            
+            // Check if ball crossed boundary
+            checkBoundary: function() {
+                if (!GameState.ballHitByBat) return;
+                
+                const ball = GameState.ballPosition;
+                const distanceFromCenter = Math.sqrt(ball.x * ball.x + Math.pow(ball.z + 11, 2));
+                
+                if (distanceFromCenter >= CONFIG.boundaryDistance) {
+                    // Check if it was a six (ball was in air) or four (bounced)
+                    if (ball.y > 0.5) {
+                        // Six!
+                        GameState.runs += 6;
+                        GameState.sixes++;
+                        GameState.bestShot = 'SIX!';
+                        showShotFeedback('SIX!', 'six');
+                        AudioSystem.playCrowdCheer('six');
+                    } else {
+                        // Four!
+                        GameState.runs += 4;
+                        GameState.fours++;
+                        GameState.bestShot = 'FOUR!';
+                        showShotFeedback('FOUR!', 'four');
+                        AudioSystem.playCrowdCheer('four');
+                    }
+                    
+                    this.endDelivery();
+                }
+            },
+            
+            // Check if ball hit stumps
+            checkStumps: function() {
+                if (GameState.ballHitByBat) return;
+                
+                const ball = GameState.ballPosition;
+                const stumpsPos = { x: 0, y: 0.35, z: 0.5 };
+                
+                // Check if ball is near stumps
+                if (ball.z > 0.3 && ball.z < 0.7 &&
+                    Math.abs(ball.x) < 0.15 &&
+                    ball.y < 0.75 && ball.y > 0) {
+                    
+                    // BOWLED!
+                    GameState.wickets++;
+                    showShotFeedback('BOWLED!', 'out');
+                    AudioSystem.playStumpsHit();
+                    
+                    // Animate bails
+                    this.animateBails();
+                    
+                    this.endDelivery();
+                }
+            },
+            
+            // Check for catches
+            checkFielderCatch: function() {
+                if (!GameState.ballHitByBat) return;
+                if (GameState.ballPosition.y <= 0.3) return; // Ball too low
+                
+                const ball = GameState.ballPosition;
+                const fielders = document.querySelectorAll('.fielder');
+                
+                fielders.forEach(fielder => {
+                    const pos = fielder.getAttribute('position');
+                    const distance = Math.sqrt(
+                        Math.pow(ball.x - pos.x, 2) +
+                        Math.pow(ball.z - pos.z, 2)
+                    );
+                    
+                    // Catch radius depends on difficulty
+                    const catchRadius = GameState.difficulty === 'easy' ? 1 : 
+                                       GameState.difficulty === 'medium' ? 1.5 : 2;
+                    
+                    if (distance < catchRadius && ball.y > 0.3 && ball.y < 3) {
+                        // Random catch success based on difficulty
+                        const catchChance = GameState.difficulty === 'easy' ? 0.3 :
+                                           GameState.difficulty === 'medium' ? 0.5 : 0.7;
+                        
+                        if (Math.random() < catchChance) {
+                            // CAUGHT!
+                            GameState.wickets++;
+                            showShotFeedback('CAUGHT!', 'out');
+                            this.endDelivery();
+                        }
+                    }
+                });
+            },
+            
+            // Ball stopped rolling
+            ballStopped: function() {
+                if (!GameState.ballHitByBat) {
+                    // Missed the ball - check if it was a wide or passed stumps
+                    const ball = GameState.ballPosition;
+                    if (ball.z > 2) {
+                        // Ball passed - could be wide or keeper stopped it
+                        this.endDelivery();
+                    }
+                } else {
+                    // Calculate runs based on where ball stopped
+                    const ball = GameState.ballPosition;
+                    const distanceFromCenter = Math.sqrt(ball.x * ball.x + Math.pow(ball.z + 11, 2));
+                    
+                    let runs = 0;
+                    if (distanceFromCenter > 50) runs = 3;
+                    else if (distanceFromCenter > 30) runs = 2;
+                    else if (distanceFromCenter > 15) runs = 1;
+                    
+                    if (runs > 0) {
+                        GameState.runs += runs;
+                        showShotFeedback(`${runs} RUN${runs > 1 ? 'S' : ''}`, 'runs');
+                    } else {
+                        GameState.dotBalls++;
+                        showShotFeedback('DOT BALL', 'runs');
+                    }
+                    
+                    this.endDelivery();
+                }
+            },
+            
+            // Animate bails falling
+            animateBails: function() {
+                const bail1 = document.getElementById('bail-1');
+                const bail2 = document.getElementById('bail-2');
+                
+                if (bail1) {
+                    bail1.setAttribute('animation', {
+                        property: 'position',
+                        to: '-0.1 0.5 0.2',
+                        dur: 500,
+                        easing: 'easeOutQuad'
+                    });
+                    bail1.setAttribute('animation__rot', {
+                        property: 'rotation',
+                        to: '45 30 60',
+                        dur: 500,
+                        easing: 'easeOutQuad'
+                    });
+                }
+                
+                if (bail2) {
+                    bail2.setAttribute('animation', {
+                        property: 'position',
+                        to: '0.1 0.5 0.2',
+                        dur: 500,
+                        easing: 'easeOutQuad'
+                    });
+                    bail2.setAttribute('animation__rot', {
+                        property: 'rotation',
+                        to: '-45 -30 -60',
+                        dur: 500,
+                        easing: 'easeOutQuad'
+                    });
+                }
+            },
+            
+            // Reset bails position
+            resetBails: function() {
+                const bail1 = document.getElementById('bail-1');
+                const bail2 = document.getElementById('bail-2');
+                
+                if (bail1) {
+                    bail1.removeAttribute('animation');
+                    bail1.removeAttribute('animation__rot');
+                    bail1.setAttribute('position', '-0.0575 0.72 0');
+                    bail1.setAttribute('rotation', '0 0 0');
+                }
+                
+                if (bail2) {
+                    bail2.removeAttribute('animation');
+                    bail2.removeAttribute('animation__rot');
+                    bail2.setAttribute('position', '0.0575 0.72 0');
+                    bail2.setAttribute('rotation', '0 0 0');
+                }
+            },
+            
+            // Update ball trail
+            updateBallTrail: function() {
+                // Simple trail using position markers
+                const trailContainer = document.getElementById('ball-trail');
+                if (!trailContainer) return;
+                
+                // Create trail marker - make it larger and brighter
+                const marker = document.createElement('a-sphere');
+                marker.setAttribute('position', `${GameState.ballPosition.x} ${GameState.ballPosition.y} ${GameState.ballPosition.z}`);
+                marker.setAttribute('radius', '0.08');
+                marker.setAttribute('color', '#FFD700');
+                marker.setAttribute('opacity', '0.7');
+                marker.setAttribute('material', 'shader: flat; emissive: #FFD700; emissiveIntensity: 0.8');
+                
+                trailContainer.appendChild(marker);
+                
+                // Remove after delay
+                setTimeout(() => {
+                    if (marker.parentNode) {
+                        marker.parentNode.removeChild(marker);
+                    }
+                }, 500);
+            },
+            
+            // End current delivery
+            endDelivery: function() {
+                GameState.isBallInPlay = false;
+                GameState.ballsFaced++;
+                
+                // Update UI
+                updateHUD();
+                
+                // Check if innings should end
+                if (GameState.checkInningsEnd()) {
+                    endGame();
+                } else {
+                    // Prepare for next ball
+                    setTimeout(() => {
+                        GameState.isReadyForBall = true;
+                        hideBall();
+                        this.resetBails();
+                        
+                        // Auto-bowl in practice mode
+                        if (GameState.mode === 'practice') {
+                            setTimeout(() => {
+                                if (GameState.isPlaying && !GameState.isPaused) {
+                                    bowlBall();
+                                }
+                            }, 1500);
+                        }
+                    }, 1500);
+                }
+            }
+        };
+        
+        // ========================================================================
+        // BATTING SYSTEM
+        // ========================================================================
+        
+        const BattingSystem = {
+            lastFrameTime: 0,
+            velocityHistory: [],
+            
+            // Update bat tracking
+            updateBat: function(position, rotation) {
+                const now = performance.now();
+                const deltaTime = (now - this.lastFrameTime) / 1000;
+                this.lastFrameTime = now;
+                
+                if (deltaTime > 0 && deltaTime < 0.1) {
+                    // Calculate velocity
+                    GameState.batVelocity = {
+                        x: (position.x - GameState.batPrevPosition.x) / deltaTime,
+                        y: (position.y - GameState.batPrevPosition.y) / deltaTime,
+                        z: (position.z - GameState.batPrevPosition.z) / deltaTime
+                    };
+                    
+                    // Store velocity history for averaging
+                    this.velocityHistory.push({...GameState.batVelocity});
+                    if (this.velocityHistory.length > 5) {
+                        this.velocityHistory.shift();
+                    }
+                }
+                
+                // Update previous position
+                GameState.batPrevPosition = {...position};
+                GameState.batPosition = position;
+                GameState.batRotation = rotation;
+            },
+            
+            // Get average bat velocity
+            getAverageVelocity: function() {
+                if (this.velocityHistory.length === 0) {
+                    return { x: 0, y: 0, z: 0 };
+                }
+                
+                const avg = { x: 0, y: 0, z: 0 };
+                this.velocityHistory.forEach(v => {
+                    avg.x += v.x;
+                    avg.y += v.y;
+                    avg.z += v.z;
+                });
+                
+                avg.x /= this.velocityHistory.length;
+                avg.y /= this.velocityHistory.length;
+                avg.z /= this.velocityHistory.length;
+                
+                return avg;
+            },
+            
+            // Get bat speed
+            getBatSpeed: function() {
+                const vel = this.getAverageVelocity();
+                return Math.sqrt(vel.x * vel.x + vel.y * vel.y + vel.z * vel.z);
+            },
+            
+            // Check bat-ball collision
+            checkCollision: function() {
+                if (!GameState.isBallInPlay || GameState.ballHitByBat) return;
+                
+                const ball = GameState.ballPosition;
+                const bat = GameState.batPosition;
+                
+                // Get bat world position (accounting for controller position)
+                const rightHand = document.getElementById('right-hand');
+                if (!rightHand) return;
+                
+                const batWorldPos = rightHand.object3D.position.clone();
+                const batEntity = document.getElementById('cricket-bat');
+                if (batEntity) {
+                    // Add bat offset
+                    batWorldPos.y += 0.5; // Bat blade center
+                }
+                
+                // Calculate distance to bat blade
+                const dx = ball.x - batWorldPos.x;
+                const dy = ball.y - batWorldPos.y;
+                const dz = ball.z - batWorldPos.z;
+                const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                
+                // Collision threshold (bat blade dimensions + ball radius)
+                const collisionThreshold = 0.35;
+                
+                if (distance < collisionThreshold) {
+                    this.handleHit(batWorldPos);
+                }
+            },
+            
+            // Handle bat hitting ball
+            handleHit: function(batWorldPos) {
+                GameState.ballHitByBat = true;
+                
+                // Get bat velocity and speed
+                const batVel = this.getAverageVelocity();
+                const batSpeed = this.getBatSpeed();
+                
+                // Determine hit quality based on contact point
+                const ball = GameState.ballPosition;
+                const hitQuality = this.calculateHitQuality(ball, batWorldPos);
+                
+                // Determine shot type based on bat movement
+                const shotType = this.determineShotType(batVel, GameState.batRotation);
+                
+                // Calculate new ball velocity
+                const powerMultiplier = this.getPowerMultiplier(hitQuality);
+                const baseSpeed = batSpeed * powerMultiplier * 2;
+                
+                // Direction based on shot type and bat angle
+                let newVel = this.calculateShotVelocity(shotType, batVel, baseSpeed, hitQuality);
+                
+                GameState.ballVelocity = newVel;
+                
+                // Visual and audio feedback
+                this.showHitFeedback(hitQuality, shotType);
+                AudioSystem.playBatHit(hitQuality);
+                
+                // Update HUD with shot type
+                document.getElementById('hud-shot').textContent = shotType;
+                const vrShotText = document.getElementById('vr-shot-text');
+                if (vrShotText) {
+                    vrShotText.setAttribute('value', shotType);
+                }
+            },
+            
+            // Calculate hit quality (sweet spot, edge, etc.)
+            calculateHitQuality: function(ballPos, batPos) {
+                const dy = Math.abs(ballPos.y - batPos.y);
+                const dx = Math.abs(ballPos.x - batPos.x);
+                
+                // Sweet spot detection
+                if (dy < 0.1 && dx < 0.03) {
+                    return 'perfect';
+                } else if (dy < 0.2 && dx < 0.05) {
+                    return 'good';
+                } else if (dx > 0.04) {
+                    return 'edge';
+                } else {
+                    return 'fair';
+                }
+            },
+            
+            // Determine shot type based on bat movement
+            determineShotType: function(velocity, rotation) {
+                const vx = velocity.x;
+                const vy = velocity.y;
+                const vz = velocity.z;
+                
+                // Horizontal vs vertical movement
+                const horizontalSpeed = Math.sqrt(vx * vx + vz * vz);
+                const verticalSpeed = Math.abs(vy);
+                
+                // Direction of horizontal movement
+                const isOffSide = vx > 0.5;
+                const isLegSide = vx < -0.5;
+                const isForward = vz < -0.5;
+                const isBackward = vz > 0.5;
+                
+                // Determine shot
+                if (verticalSpeed > horizontalSpeed * 1.5) {
+                    if (vy > 0) {
+                        return 'Lofted Shot';
+                    } else {
+                        return 'Defensive Block';
+                    }
+                }
+                
+                if (isForward) {
+                    if (isOffSide) return 'Cover Drive';
+                    if (isLegSide) return 'On Drive';
+                    return 'Straight Drive';
+                }
+                
+                if (isBackward) {
+                    if (isOffSide) return 'Late Cut';
+                    if (isLegSide) return 'Flick';
+                    return 'Defensive';
+                }
+                
+                if (horizontalSpeed > 3) {
+                    if (isOffSide) return 'Cut Shot';
+                    if (isLegSide) return 'Pull Shot';
+                }
+                
+                return 'Shot';
+            },
+            
+            // Get power multiplier based on hit quality
+            getPowerMultiplier: function(quality) {
+                switch (quality) {
+                    case 'perfect': return 1.5;
+                    case 'good': return 1.2;
+                    case 'fair': return 0.8;
+                    case 'edge': return 0.5;
+                    default: return 0.7;
+                }
+            },
+            
+            // Calculate ball velocity after being hit
+            calculateShotVelocity: function(shotType, batVel, baseSpeed, quality) {
+                let vx = 0, vy = 0, vz = 0;
+                
+                // Base direction from bat velocity
+                const batMag = Math.sqrt(batVel.x * batVel.x + batVel.y * batVel.y + batVel.z * batVel.z);
+                if (batMag > 0) {
+                    vx = (batVel.x / batMag) * baseSpeed;
+                    vy = (batVel.y / batMag) * baseSpeed;
+                    vz = (batVel.z / batMag) * baseSpeed;
+                }
+                
+                // Ensure ball goes away from batsman
+                if (vz > 0) vz = -vz;
+                
+                // Add upward component for lofted shots
+                if (Math.abs(batVel.y) > 2) {
+                    vy = Math.abs(vy) * 0.5;
+                }
+                
+                // Edge deflection
+                if (quality === 'edge') {
+                    vx += (Math.random() - 0.5) * baseSpeed * 0.5;
+                    vz *= 0.3;
+                }
+                
+                // Minimum forward velocity
+                if (Math.abs(vz) < 5) {
+                    vz = -5;
+                }
+                
+                // Add slight randomness
+                vx += (Math.random() - 0.5) * 2;
+                vy += (Math.random() - 0.5) * 2;
+                
+                return { x: vx, y: Math.max(vy, 2), z: vz };
+            },
+            
+            // Show hit feedback visuals
+            showHitFeedback: function(quality, shotType) {
+                const batBlade = document.getElementById('bat-blade');
+                const sweetSpot = document.getElementById('sweet-spot');
+                
+                let color = '#FFFFFF';
+                if (quality === 'perfect') color = '#00FF00';
+                else if (quality === 'good') color = '#FFFF00';
+                else if (quality === 'edge') color = '#FF0000';
+                
+                // Flash bat
+                if (batBlade) {
+                    batBlade.setAttribute('color', color);
+                    setTimeout(() => {
+                        batBlade.setAttribute('color', '#F5DEB3');
+                    }, 200);
+                }
+                
+                // Show hit particles
+                const particles = document.getElementById('hit-particles');
+                if (particles) {
+                    particles.setAttribute('position', `${GameState.ballPosition.x} ${GameState.ballPosition.y} ${GameState.ballPosition.z}`);
+                    particles.setAttribute('visible', 'true');
+                    particles.querySelector('a-sphere').setAttribute('color', color);
+                    
+                    setTimeout(() => {
+                        particles.setAttribute('visible', 'false');
+                    }, 300);
+                }
+            }
+        };
+        
+        // ========================================================================
+        // UI FUNCTIONS
+        // ========================================================================
+        
+        function showShotFeedback(text, type) {
+            const feedback = document.getElementById('shot-feedback');
+            feedback.textContent = text;
+            feedback.className = `show ${type}`;
+            
+            setTimeout(() => {
+                feedback.className = '';
+            }, 1500);
+        }
+        
+        function updateHUD() {
+            document.getElementById('hud-runs').textContent = GameState.runs;
+            document.getElementById('hud-wickets').textContent = GameState.wickets;
+            document.getElementById('hud-balls').textContent = GameState.ballsFaced;
+            document.getElementById('hud-fours').textContent = GameState.fours;
+            document.getElementById('hud-sixes').textContent = GameState.sixes;
+            document.getElementById('hud-sr').textContent = GameState.getStrikeRate();
+            
+            // Update VR HUD
+            const vrScoreText = document.getElementById('vr-score-text');
+            const vrBallsText = document.getElementById('vr-balls-text');
+            
+            if (vrScoreText) {
+                vrScoreText.setAttribute('value', `${GameState.runs}/${GameState.wickets}`);
+            }
+            if (vrBallsText) {
+                vrBallsText.setAttribute('value', `Balls: ${GameState.ballsFaced}`);
+            }
+        }
+        
+        function showVRHUD(show) {
+            const elements = ['vr-scoreboard', 'vr-score-text', 'vr-balls-text', 'vr-shot-text'];
+            elements.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.setAttribute('visible', show);
+            });
+        }
+        
+        function hideBall() {
+            const ball = document.getElementById('cricket-ball');
+            if (ball) {
+                ball.setAttribute('visible', 'false');
+                ball.setAttribute('position', '0 1.5 -24');
+            }
+            
+            // Clear trail
+            const trailContainer = document.getElementById('ball-trail');
+            if (trailContainer) {
+                trailContainer.innerHTML = '';
+            }
+        }
+        
+        function showBall() {
+            const ball = document.getElementById('cricket-ball');
+            if (ball) {
+                ball.setAttribute('visible', 'true');
+            }
+        }
+        
+        // ========================================================================
+        // GAME CONTROL FUNCTIONS
+        // ========================================================================
+        
+        function startGame() {
+            // Get selected options
+            const modeBtn = document.querySelector('[data-mode].active');
+            const difficultyBtn = document.querySelector('[data-difficulty].active');
+            const oversBtn = document.querySelector('[data-overs].active');
+            
+            GameState.mode = modeBtn ? modeBtn.dataset.mode : 'practice';
+            GameState.difficulty = difficultyBtn ? difficultyBtn.dataset.difficulty : 'medium';
+            GameState.totalOvers = oversBtn ? parseInt(oversBtn.dataset.overs) : 1;
+            
+            // Set target for target chase mode
+            if (GameState.mode === 'target') {
+                const baseTarget = GameState.totalOvers * 8; // ~8 runs per over average
+                GameState.targetScore = baseTarget + Math.floor(Math.random() * (GameState.totalOvers * 4));
+                document.getElementById('hud-target').textContent = GameState.targetScore;
+                document.getElementById('hud-target-row').style.display = 'flex';
+            } else {
+                document.getElementById('hud-target-row').style.display = 'none';
+            }
+            
+            // Reset state
+            GameState.reset();
+            
+            // Update UI
+            document.getElementById('menu-overlay').classList.add('hidden');
+            document.getElementById('game-hud').classList.remove('hidden');
+            updateHUD();
+            
+            // Initialize audio on user interaction
+            AudioSystem.init();
+            
+            // Reset bails
+            PhysicsSystem.resetBails();
+            
+            // Show VR HUD
+            showVRHUD(true);
+            
+            // Start first ball after delay
+            setTimeout(() => {
+                bowlBall();
+            }, 2000);
+        }
+        
+        function bowlBall() {
+            if (!GameState.isPlaying || GameState.isPaused || GameState.isBallInPlay) return;
+            
+            // Generate delivery
+            const delivery = BowlingSystem.generateDelivery();
+            
+            console.log('Bowling delivery:', delivery);
+            console.log('Ball velocity:', delivery.velocity);
+            
+            // Set ball initial state
+            GameState.ballPosition = {...delivery.startPos};
+            GameState.ballVelocity = {...delivery.velocity};
+            GameState.ballHasBouncedOnPitch = false;
+            GameState.ballHitByBat = false;
+            GameState.isBallInPlay = true;
+            GameState.isReadyForBall = false;
+            
+            // Show ball
+            showBall();
+            const ball = document.getElementById('cricket-ball');
+            if (ball) {
+                ball.setAttribute('position', `${delivery.startPos.x} ${delivery.startPos.y} ${delivery.startPos.z}`);
+            }
+            
+            console.log('Ball spawned at:', GameState.ballPosition);
+            
+            // Animate bowler
+            animateBowler();
+        }
+        
+        function animateBowler() {
+            const bowlerArm = document.getElementById('bowler-arm-right');
+            if (bowlerArm) {
+                bowlerArm.setAttribute('animation', {
+                    property: 'rotation',
+                    from: '0 0 -30',
+                    to: '-180 0 -30',
+                    dur: 300,
+                    easing: 'easeInQuad'
+                });
+                
+                setTimeout(() => {
+                    bowlerArm.setAttribute('rotation', '0 0 -30');
+                    bowlerArm.removeAttribute('animation');
+                }, 500);
+            }
+        }
+        
+        function pauseGame() {
+            if (!GameState.isPlaying || GameState.isGameOver) return;
+            
+            GameState.isPaused = true;
+            document.getElementById('pause-menu').classList.remove('hidden');
+        }
+        
+        function resumeGame() {
+            GameState.isPaused = false;
+            document.getElementById('pause-menu').classList.add('hidden');
+        }
+        
+        function restartGame() {
+            document.getElementById('pause-menu').classList.add('hidden');
+            document.getElementById('game-over').classList.add('hidden');
+            
+            // Reset and start
+            GameState.reset();
+            PhysicsSystem.resetBails();
+            hideBall();
+            updateHUD();
+            
+            setTimeout(() => {
+                bowlBall();
+            }, 1500);
+        }
+        
+        function quitToMenu() {
+            GameState.isPlaying = false;
+            GameState.isPaused = false;
+            
+            document.getElementById('pause-menu').classList.add('hidden');
+            document.getElementById('game-over').classList.add('hidden');
+            document.getElementById('game-hud').classList.add('hidden');
+            document.getElementById('menu-overlay').classList.remove('hidden');
+            
+            showVRHUD(false);
+            hideBall();
+            PhysicsSystem.resetBails();
+        }
+        
+        function endGame() {
+            GameState.isPlaying = false;
+            GameState.isGameOver = true;
+            
+            // Determine game over message
+            let title = 'INNINGS OVER';
+            if (GameState.mode === 'target') {
+                if (GameState.runs >= GameState.targetScore) {
+                    title = '🎉 TARGET ACHIEVED!';
+                } else {
+                    title = '😔 TARGET MISSED';
+                }
+            } else if (GameState.mode === 'survival' && GameState.wickets > 0) {
+                title = 'OUT!';
+            }
+            
+            document.getElementById('game-over-title').textContent = title;
+            document.getElementById('final-score').textContent = GameState.runs;
+            document.getElementById('final-balls').textContent = GameState.ballsFaced;
+            document.getElementById('final-fours').textContent = GameState.fours;
+            document.getElementById('final-sixes').textContent = GameState.sixes;
+            document.getElementById('final-sr').textContent = GameState.getStrikeRate();
+            document.getElementById('final-best').textContent = GameState.bestShot || 'N/A';
+            
+            // Update high score
+            if (GameState.runs > GameState.highScore) {
+                GameState.highScore = GameState.runs;
+                localStorage.setItem('cricketHighScore', GameState.runs);
+            }
+            
+            document.getElementById('game-over').classList.remove('hidden');
+        }
+        
+        // ========================================================================
+        // GAME LOOP
+        // ========================================================================
+        
+        let lastTime = 0;
+        
+        function gameLoop(currentTime) {
+            requestAnimationFrame(gameLoop);
+            
+            if (!GameState.isPlaying || GameState.isPaused) return;
+            
+            const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1);
+            lastTime = currentTime;
+            
+            // Update physics
+            PhysicsSystem.updateBall(deltaTime);
+            
+            // Check bat collision
+            BattingSystem.checkCollision();
+        }
+        
+        // ========================================================================
+        // EVENT LISTENERS & INITIALIZATION
+        // ========================================================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Menu button selection
+            document.querySelectorAll('.menu-btn[data-mode]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('[data-mode]').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+            
+            document.querySelectorAll('.menu-btn[data-difficulty]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('[data-difficulty]').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+            
+            document.querySelectorAll('.menu-btn[data-overs]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('[data-overs]').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+            
+            // Game control buttons
+            document.getElementById('start-btn').addEventListener('click', startGame);
+            document.getElementById('resume-btn').addEventListener('click', resumeGame);
+            document.getElementById('restart-btn').addEventListener('click', restartGame);
+            document.getElementById('quit-btn').addEventListener('click', quitToMenu);
+            document.getElementById('play-again-btn').addEventListener('click', restartGame);
+            document.getElementById('menu-btn').addEventListener('click', quitToMenu);
+            
+            // Keyboard controls (for testing)
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    if (GameState.isPaused) {
+                        resumeGame();
+                    } else if (GameState.isPlaying) {
+                        pauseGame();
+                    }
+                }
+                if (e.key === ' ' && GameState.isPlaying && GameState.isReadyForBall) {
+                    bowlBall();
+                }
+            });
+            
+            // Start game loop
+            requestAnimationFrame(gameLoop);
+        });
+        
+        // A-Frame scene initialization
+        const scene = document.querySelector('a-scene');
+        if (scene) {
+            scene.addEventListener('loaded', function() {
+                console.log('VR Cricket Scene Loaded!');
+                
+                // Set up controller tracking
+                const rightHand = document.getElementById('right-hand');
+                
+                if (rightHand) {
+                    // Track controller movement
+                    rightHand.addEventListener('controllerconnected', function() {
+                        console.log('Right controller connected');
+                    });
+                    
+                    // Grip button for pause
+                    rightHand.addEventListener('gripdown', function() {
+                        if (GameState.isPlaying && !GameState.isPaused) {
+                            pauseGame();
+                        }
+                    });
+                    
+                    // Track bat position
+                    setInterval(function() {
+                        if (rightHand.object3D) {
+                            const pos = rightHand.object3D.position;
+                            const rot = rightHand.object3D.rotation;
+                            BattingSystem.updateBat(
+                                { x: pos.x, y: pos.y, z: pos.z },
+                                { x: rot.x, y: rot.y, z: rot.z }
+                            );
+                        }
+                    }, 16); // ~60fps tracking
+                }
+                
+                const leftHand = document.getElementById('left-hand');
+                if (leftHand) {
+                    // Trigger for ready/next ball
+                    leftHand.addEventListener('triggerdown', function() {
+                        if (GameState.isPlaying && !GameState.isPaused && GameState.isReadyForBall) {
+                            bowlBall();
+                        }
+                    });
+                    
+                    // Grip for reset position
+                    leftHand.addEventListener('gripdown', function() {
+                        const rig = document.getElementById('rig');
+                        if (rig) {
+                            rig.setAttribute('position', '0 0 0');
+                        }
+                    });
+                }
+            });
+            
+            // VR mode events
+            scene.addEventListener('enter-vr', function() {
+                console.log('Entered VR mode');
+                showVRHUD(true);
+            });
+            
+            scene.addEventListener('exit-vr', function() {
+                console.log('Exited VR mode');
+                showVRHUD(false);
+            });
+        }
+        
+        // Mouse/Touch controls for non-VR testing
+        let isDragging = false;
+        let lastMouseX = 0;
+        let lastMouseY = 0;
+        
+        document.addEventListener('mousedown', function(e) {
+            if (e.target.tagName === 'CANVAS') {
+                isDragging = true;
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+            }
+        });
+        
+        document.addEventListener('mousemove', function(e) {
+            if (isDragging && GameState.isPlaying) {
+                const deltaX = (e.clientX - lastMouseX) * 0.01;
+                const deltaY = (e.clientY - lastMouseY) * 0.01;
+                
+                // Simulate bat movement for testing
+                BattingSystem.updateBat(
+                    { 
+                        x: GameState.batPosition.x + deltaX, 
+                        y: GameState.batPosition.y - deltaY, 
+                        z: GameState.batPosition.z 
+                    },
+                    GameState.batRotation
+                );
+                
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+            }
+        });
+        
+        document.addEventListener('mouseup', function() {
+            isDragging = false;
+        });
+        
+        // Click to hit for testing
+        document.addEventListener('click', function(e) {
+            if (e.target.tagName === 'CANVAS' && GameState.isBallInPlay && !GameState.ballHitByBat) {
+                // Simulate a hit for desktop testing
+                const ball = GameState.ballPosition;
+                if (ball.z > -2 && ball.z < 2) {
+                    // Ball is in hitting zone
+                    const simulatedBatPos = { x: 0, y: 1.2, z: 0 };
+                    BattingSystem.velocityHistory = [
+                        { x: (Math.random() - 0.5) * 10, y: 3 + Math.random() * 2, z: -8 - Math.random() * 4 }
+                    ];
+                    BattingSystem.handleHit(simulatedBatPos);
+                }
+            }
+        });
+        
+    })();
+    </script>
+</body>
+</html>
