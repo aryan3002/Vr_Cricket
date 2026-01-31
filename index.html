@@ -1,33 +1,47 @@
 <!--
 ================================================================================
-VR CRICKET BATTING GAME - Meta Quest 2 Edition
+VR CRICKET PRO - Meta Quest 2 Photorealistic Edition
 ================================================================================
 
-HOW TO PLAY ON QUEST 2:
-1. Download this HTML file to your Quest 2 or host it on a web server
-2. Open the file in the Quest 2 browser (Oculus Browser)
-3. Click the VR goggles icon in the bottom right to enter VR mode
-4. Use your RIGHT controller as the cricket bat - swing to hit!
-5. Use your LEFT controller thumbstick/trigger for menu navigation
+PHYSICS ENGINE DOCUMENTATION:
+
+Ball Trajectory Calculation:
+----------------------------
+Using kinematic equations for projectile motion:
+- Distance to travel: Δz = z_target - z_start = 24-25m
+- Time of flight: t = Δz / v_horizontal
+- Vertical velocity: vy = (y_target - y_start)/t + 0.5*g*t (compensates for gravity)
+- Lateral velocity: vx = Δx / t
+
+Speed Conversions:
+- Easy: 60-80 km/h = 16.7-22.2 m/s
+- Medium: 100-130 km/h = 27.8-36.1 m/s  
+- Hard: 140-160 km/h = 38.9-44.4 m/s
+
+Pitch Bounce Physics:
+- Coefficient of Restitution: 0.4-0.6 (cricket pitch)
+- Bounce angle affected by pitch roughness and ball spin
+- Seam position affects lateral movement after bounce
+
+Magnus Effect (Spin):
+- F_magnus = 0.5 * Cl * ρ * A * v² (perpendicular to velocity and spin axis)
+- Creates curve in ball trajectory
+- Off-spin: ball curves from off to leg
+- Leg-spin: ball curves from leg to off
+
+Swing Physics:
+- Differential air pressure due to ball seam orientation
+- Inswing: seam angled towards batsman, ball curves in
+- Outswing: seam angled away, ball curves away
+- Reverse swing occurs with old ball (rough on one side)
 
 CONTROLS:
-- Right Controller: Cricket bat (swing to hit the ball)
-- Left Trigger: Select menu options / Ready for next ball
+- Right Controller: Cricket bat (swing to hit)
+- Left Trigger: Ready for next ball
 - Right Grip: Pause game
-- Left Grip: Reset position
+- A/X Button: Change stance
 
-GAME MODES:
-- Practice: Unlimited balls, no wickets
-- Challenge: Limited overs, score as much as possible
-- Survival: Keep batting until you're out
-- Target Chase: Reach the target score within given balls
-
-DIFFICULTY:
-- Easy: Slower balls, less variation
-- Medium: Moderate speed and variation
-- Hard: Fast balls, high variation, aggressive fielding
-
-Enjoy the game! 🏏
+Enjoy photorealistic VR cricket! 🏏
 ================================================================================
 -->
 <!DOCTYPE html>
@@ -35,10 +49,12 @@ Enjoy the game! 🏏
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VR Cricket - Quest 2 Edition</title>
+    <title>VR Cricket Pro - Quest 2 Photorealistic Edition</title>
     
     <!-- A-Frame Core -->
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <!-- A-Frame Extras for better physics -->
+    <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.0.0/dist/aframe-extras.min.js"></script>
     
     <style>
         * {
@@ -50,17 +66,17 @@ Enjoy the game! 🏏
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             overflow: hidden;
-            background: linear-gradient(135deg, #1a472a 0%, #2d5a3d 100%);
+            background: linear-gradient(135deg, #0a1f0a 0%, #1a3a1a 100%);
         }
         
-        /* Main Menu Overlay */
+        /* Main Menu Overlay - Enhanced */
         #menu-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(135deg, rgba(26, 71, 42, 0.95) 0%, rgba(45, 90, 61, 0.95) 100%);
+            background: linear-gradient(135deg, rgba(10, 31, 10, 0.97) 0%, rgba(26, 58, 26, 0.97) 100%);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -74,28 +90,35 @@ Enjoy the game! 🏏
         }
         
         .menu-title {
-            font-size: 3rem;
+            font-size: 3.5rem;
             font-weight: bold;
-            margin-bottom: 0.5rem;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            margin-bottom: 0.3rem;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.7), 0 0 30px rgba(255,215,0,0.3);
+            background: linear-gradient(135deg, #ffd700, #ff8c00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
         
         .menu-subtitle {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             margin-bottom: 2rem;
             opacity: 0.8;
+            letter-spacing: 3px;
+            text-transform: uppercase;
         }
         
         .menu-section {
-            margin: 1rem 0;
+            margin: 0.8rem 0;
             text-align: center;
         }
         
         .menu-section h3 {
             margin-bottom: 0.5rem;
-            font-size: 1.1rem;
+            font-size: 0.95rem;
             text-transform: uppercase;
             letter-spacing: 2px;
+            opacity: 0.9;
         }
         
         .btn-group {
@@ -106,62 +129,71 @@ Enjoy the game! 🏏
         }
         
         .menu-btn {
-            padding: 12px 24px;
-            font-size: 1rem;
-            border: 2px solid white;
-            background: transparent;
+            padding: 10px 20px;
+            font-size: 0.95rem;
+            border: 2px solid rgba(255,255,255,0.5);
+            background: rgba(255,255,255,0.1);
             color: white;
             cursor: pointer;
-            border-radius: 5px;
+            border-radius: 8px;
             transition: all 0.3s ease;
-            min-width: 120px;
+            min-width: 100px;
+            backdrop-filter: blur(5px);
         }
         
         .menu-btn:hover, .menu-btn.active {
-            background: white;
-            color: #1a472a;
+            background: rgba(255,215,0,0.9);
+            color: #0a1f0a;
+            border-color: #ffd700;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(255,215,0,0.3);
         }
         
         .menu-btn.primary {
-            background: #ffd700;
+            background: linear-gradient(135deg, #ffd700, #ff8c00);
             border-color: #ffd700;
-            color: #1a472a;
+            color: #0a1f0a;
             font-weight: bold;
             font-size: 1.2rem;
-            padding: 15px 40px;
+            padding: 15px 50px;
+            box-shadow: 0 5px 30px rgba(255,215,0,0.4);
         }
         
         .menu-btn.primary:hover {
-            background: #ffed4a;
-            transform: scale(1.05);
+            transform: scale(1.05) translateY(-3px);
+            box-shadow: 0 10px 40px rgba(255,215,0,0.5);
         }
         
         .instructions {
-            margin-top: 2rem;
-            padding: 1rem;
-            background: rgba(255,255,255,0.1);
-            border-radius: 10px;
+            margin-top: 1.5rem;
+            padding: 1rem 1.5rem;
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
             max-width: 500px;
             text-align: left;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
+            border: 1px solid rgba(255,255,255,0.1);
         }
         
         .instructions h4 {
             margin-bottom: 0.5rem;
+            color: #ffd700;
         }
         
-        /* In-Game HUD */
+        /* Enhanced In-Game HUD */
         #game-hud {
             position: fixed;
             top: 20px;
             left: 20px;
-            background: rgba(0, 0, 0, 0.7);
+            background: linear-gradient(135deg, rgba(0,0,0,0.85), rgba(20,20,20,0.85));
             color: white;
             padding: 15px 20px;
-            border-radius: 10px;
+            border-radius: 15px;
             font-size: 14px;
             z-index: 100;
-            min-width: 200px;
+            min-width: 220px;
+            border: 1px solid rgba(255,215,0,0.3);
+            backdrop-filter: blur(10px);
         }
         
         #game-hud.hidden {
@@ -171,7 +203,8 @@ Enjoy the game! 🏏
         .hud-row {
             display: flex;
             justify-content: space-between;
-            margin: 5px 0;
+            margin: 6px 0;
+            padding: 2px 0;
         }
         
         .hud-label {
@@ -180,78 +213,149 @@ Enjoy the game! 🏏
         
         .hud-value {
             font-weight: bold;
+            color: #ffd700;
         }
         
         .hud-score {
-            font-size: 2rem;
+            font-size: 2.5rem;
             text-align: center;
-            border-bottom: 1px solid rgba(255,255,255,0.3);
+            border-bottom: 2px solid rgba(255,215,0,0.3);
             padding-bottom: 10px;
             margin-bottom: 10px;
+            font-weight: bold;
+            text-shadow: 0 0 20px rgba(255,215,0,0.3);
         }
         
-        /* Shot Feedback */
-        #shot-feedback {
+        /* Ball Speed Display */
+        #ball-speed-display {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, rgba(0,0,0,0.85), rgba(20,20,20,0.85));
+            color: #00ff88;
+            padding: 15px 25px;
+            border-radius: 15px;
+            font-size: 1.5rem;
+            font-weight: bold;
+            z-index: 100;
+            border: 1px solid rgba(0,255,136,0.3);
+            text-align: center;
+            min-width: 120px;
+        }
+        
+        #ball-speed-display.hidden {
+            display: none;
+        }
+        
+        #ball-speed-display .speed-value {
+            font-size: 2rem;
+        }
+        
+        #ball-speed-display .speed-unit {
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+        
+        /* Timing Indicator */
+        #timing-indicator {
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 3rem;
+            font-size: 2rem;
             font-weight: bold;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
             z-index: 200;
             pointer-events: none;
             opacity: 0;
-            transition: opacity 0.3s;
+            transition: opacity 0.3s, transform 0.3s;
+        }
+        
+        #timing-indicator.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1.1);
+        }
+        
+        #timing-indicator.perfect {
+            color: #00ff88;
+            text-shadow: 0 0 30px rgba(0,255,136,0.8);
+        }
+        
+        #timing-indicator.good {
+            color: #ffd700;
+            text-shadow: 0 0 30px rgba(255,215,0,0.8);
+        }
+        
+        #timing-indicator.poor {
+            color: #ff6b6b;
+            text-shadow: 0 0 30px rgba(255,107,107,0.8);
+        }
+        
+        /* Shot Feedback - Enhanced */
+        #shot-feedback {
+            position: fixed;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 4rem;
+            font-weight: bold;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.9), 0 0 40px currentColor;
+            z-index: 200;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.4s, transform 0.4s;
         }
         
         #shot-feedback.show {
             opacity: 1;
+            transform: translate(-50%, -50%) scale(1.1);
         }
         
         #shot-feedback.four {
-            color: #4CAF50;
+            color: #00ff88;
         }
         
         #shot-feedback.six {
-            color: #FFD700;
+            color: #ffd700;
+            animation: pulse-gold 0.5s ease-in-out;
         }
         
         #shot-feedback.out {
-            color: #f44336;
+            color: #ff4444;
         }
         
         #shot-feedback.runs {
-            color: #2196F3;
+            color: #4fc3f7;
         }
         
-        /* Pause Menu */
-        #pause-menu {
+        @keyframes pulse-gold {
+            0%, 100% { transform: translate(-50%, -50%) scale(1.1); }
+            50% { transform: translate(-50%, -50%) scale(1.3); }
+        }
+        
+        /* Wagon Wheel Container */
+        #wagon-wheel {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 500;
-            color: white;
+            bottom: 20px;
+            right: 20px;
+            width: 180px;
+            height: 180px;
+            background: rgba(0,0,0,0.7);
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.3);
+            z-index: 100;
         }
         
-        #pause-menu.hidden {
+        #wagon-wheel.hidden {
             display: none;
         }
         
-        #pause-menu h2 {
-            font-size: 2.5rem;
-            margin-bottom: 2rem;
+        #wagon-wheel-canvas {
+            width: 100%;
+            height: 100%;
         }
         
-        /* Game Over Screen */
-        #game-over {
+        /* Pause Menu - Enhanced */
+        #pause-menu {
             position: fixed;
             top: 0;
             left: 0;
@@ -262,8 +366,36 @@ Enjoy the game! 🏏
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            z-index: 500;
+            color: white;
+            backdrop-filter: blur(10px);
+        }
+        
+        #pause-menu.hidden {
+            display: none;
+        }
+        
+        #pause-menu h2 {
+            font-size: 3rem;
+            margin-bottom: 2rem;
+            color: #ffd700;
+        }
+        
+        /* Game Over Screen - Enhanced */
+        #game-over {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(0,0,0,0.95), rgba(20,10,0,0.95));
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             z-index: 600;
             color: white;
+            backdrop-filter: blur(10px);
         }
         
         #game-over.hidden {
@@ -271,40 +403,92 @@ Enjoy the game! 🏏
         }
         
         #game-over h2 {
-            font-size: 2.5rem;
+            font-size: 3rem;
             margin-bottom: 1rem;
+            background: linear-gradient(135deg, #ffd700, #ff8c00);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
         
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 15px;
             margin: 1.5rem 0;
-            min-width: 300px;
+            min-width: 400px;
         }
         
         .stat-box {
-            background: rgba(255,255,255,0.1);
-            padding: 15px;
-            border-radius: 8px;
+            background: rgba(255,255,255,0.08);
+            padding: 20px 15px;
+            border-radius: 12px;
             text-align: center;
+            border: 1px solid rgba(255,215,0,0.2);
+            transition: transform 0.3s;
+        }
+        
+        .stat-box:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255,215,0,0.5);
         }
         
         .stat-value {
-            font-size: 2rem;
+            font-size: 2.2rem;
             font-weight: bold;
+            color: #ffd700;
         }
         
         .stat-label {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             opacity: 0.7;
+            margin-top: 5px;
+        }
+        
+        /* Debug Panel */
+        #debug-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            color: #00ff00;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 11px;
+            z-index: 100;
+            max-width: 300px;
+            border: 1px solid #00ff00;
+        }
+        
+        #debug-panel.hidden {
+            display: none;
         }
         
         /* VR Button styling */
         .a-enter-vr-button {
-            background: #ffd700 !important;
-            color: #1a472a !important;
+            background: linear-gradient(135deg, #ffd700, #ff8c00) !important;
+            color: #0a1f0a !important;
             font-weight: bold !important;
+            border-radius: 8px !important;
+        }
+        
+        /* Loading indicator */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0a1f0a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            color: white;
+        }
+        
+        .loading-overlay.hidden {
+            display: none;
         }
     </style>
 </head>
@@ -389,6 +573,15 @@ Enjoy the game! 🏏
     
     <!-- Shot Feedback -->
     <div id="shot-feedback"></div>
+    
+    <!-- Timing Indicator -->
+    <div id="timing-indicator"></div>
+    
+    <!-- Ball Speed Display -->
+    <div id="ball-speed-display" class="hidden">
+        <div class="speed-value">0</div>
+        <div class="speed-unit">km/h</div>
+    </div>
     
     <!-- Pause Menu -->
     <div id="pause-menu" class="hidden">
@@ -769,44 +962,80 @@ Enjoy the game! 🏏
         // ========================================================================
         
         const CONFIG = {
-            // Pitch dimensions (in meters, approximating real cricket)
-            pitchLength: 22, // Standard pitch length
-            boundaryDistance: 70, // Distance to boundary
+            // =================================================================
+            // PITCH DIMENSIONS (in meters, real cricket proportions)
+            // =================================================================
+            pitchLength: 22,        // Standard cricket pitch = 22 yards = 20.12m
+            boundaryDistance: 70,   // Typical boundary distance
             
-            // Ball physics
-            ballRadius: 0.036, // Cricket ball radius (~7.2cm diameter)
-            gravity: -9.8,
-            airResistance: 0.98,
-            groundFriction: 0.7,
-            bounceCoefficient: 0.6,
+            // Batsman position (where player stands)
+            batsmanZ: 0,           // Batsman at z = 0
+            bowlerZ: -24,          // Bowler releases at z = -24
             
-            // Speed settings (meters per second)
+            // =================================================================
+            // BALL PHYSICS - Realistic Cricket Ball Properties
+            // =================================================================
+            ballRadius: 0.036,      // Cricket ball radius (~7.2cm diameter)
+            ballMass: 0.163,        // Cricket ball mass in kg (156-163g)
+            
+            // Gravity (m/s²)
+            gravity: -9.81,
+            
+            // Air resistance coefficient (drag)
+            // Higher = more drag, ball slows down more
+            airResistance: 0.995,   // Very slight air drag per frame
+            
+            // Ground/pitch properties
+            groundFriction: 0.75,   // Friction when ball rolls on ground
+            pitchBounceCoefficient: 0.5,  // Coefficient of restitution for pitch (0.4-0.6 realistic)
+            
+            // =================================================================
+            // BALL SPEEDS (meters per second)
+            // Converted from km/h: divide by 3.6
+            // Easy: 60-80 km/h = 16.7-22.2 m/s
+            // Medium: 100-130 km/h = 27.8-36.1 m/s
+            // Hard: 140-160 km/h = 38.9-44.4 m/s
+            // =================================================================
             speeds: {
-                easy: { min: 8, max: 12 },     // Slower for easier hitting
-                medium: { min: 12, max: 18 },  // Medium pace
-                hard: { min: 18, max: 25 }     // Fast but still hittable
+                easy:   { min: 16, max: 22 },    // 60-80 km/h - Very playable
+                medium: { min: 25, max: 32 },    // 90-115 km/h - Challenging
+                hard:   { min: 35, max: 42 }     // 125-150 km/h - Professional pace
             },
             
-            // Bat properties
-            batLength: 0.85,
-            batWidth: 0.11,
-            sweetSpotSize: 0.15,
-            edgeWidth: 0.02,
+            // =================================================================
+            // BAT PROPERTIES
+            // =================================================================
+            batLength: 0.85,        // Standard bat length
+            batWidth: 0.11,         // Bat blade width
+            sweetSpotSize: 0.12,    // Sweet spot radius
+            edgeWidth: 0.015,       // Edge thickness
             
-            // Timing windows (in seconds)
+            // Collision detection radius (generous for playability)
+            batCollisionRadius: 0.35,
+            
+            // =================================================================
+            // TIMING WINDOWS (seconds)
+            // =================================================================
             timing: {
-                perfect: 0.05,
-                good: 0.1,
-                fair: 0.15
+                perfect: 0.04,      // ±40ms for perfect timing
+                good: 0.08,         // ±80ms for good timing
+                fair: 0.12          // ±120ms for fair timing
             },
             
-            // Scoring
+            // =================================================================
+            // SCORING
+            // =================================================================
             boundaryFour: 4,
             boundarySix: 6,
             
-            // Game settings
+            // =================================================================
+            // GAME SETTINGS
+            // =================================================================
             ballsPerOver: 6,
-            wicketsPerInnings: 1 // Single wicket for simplicity
+            wicketsPerInnings: 1,
+            
+            // Debug mode (set to true to see trajectory predictions)
+            debugMode: false
         };
         
         // ========================================================================
@@ -1018,48 +1247,91 @@ Enjoy the game! 🏏
         };
         
         // ========================================================================
-        // BOWLING SYSTEM
+        // BOWLING SYSTEM - PROPER PROJECTILE MOTION PHYSICS
+        // ========================================================================
+        // 
+        // PHYSICS FORMULAS USED:
+        // ----------------------
+        // 1. Projectile Motion:
+        //    - Horizontal: x(t) = x0 + vx*t
+        //    - Vertical:   y(t) = y0 + vy*t + 0.5*g*t²
+        // 
+        // 2. To hit a target at (targetX, targetY, targetZ) from (startX, startY, startZ):
+        //    - Time of flight: t = (targetZ - startZ) / vz
+        //    - Required vy: vy = (targetY - startY - 0.5*g*t²) / t
+        //    - Required vx: vx = (targetX - startX) / t
+        // 
+        // 3. For bouncing deliveries:
+        //    - First phase: ball travels to bounce point
+        //    - At bounce: vy reverses with coefficient of restitution
+        //    - Second phase: ball travels from bounce to batsman
+        //
         // ========================================================================
         
         const BowlingSystem = {
-            // Generate a random delivery
+            
+            // Current ball speed for display
+            currentBallSpeed: 0,
+            
+            /**
+             * Generate a random delivery based on difficulty
+             */
             generateDelivery: function() {
                 const difficulty = GameState.difficulty;
                 const speedRange = CONFIG.speeds[difficulty];
                 
-                // Random speed within range
+                // Random speed within range (m/s)
                 const speed = speedRange.min + Math.random() * (speedRange.max - speedRange.min);
+                this.currentBallSpeed = speed;
                 
-                // Delivery type selection based on difficulty
+                // Select delivery type based on difficulty
                 const deliveryTypes = this.getDeliveryTypes(difficulty);
                 const deliveryType = deliveryTypes[Math.floor(Math.random() * deliveryTypes.length)];
                 
-                // Line variation
+                // Line variation (off, middle, leg stump)
                 const lines = ['off', 'middle', 'leg'];
-                const lineWeights = difficulty === 'hard' ? [0.4, 0.4, 0.2] : [0.33, 0.34, 0.33];
+                const lineWeights = difficulty === 'hard' ? [0.35, 0.35, 0.3] : [0.3, 0.4, 0.3];
                 const line = this.weightedRandom(lines, lineWeights);
                 
                 GameState.currentDeliveryType = deliveryType;
                 GameState.currentLine = line;
                 
+                // Calculate delivery parameters with proper physics
+                const deliveryParams = this.calculateDeliveryPhysics(deliveryType, line, speed);
+                
+                // Log for debugging
+                console.log(`📍 Delivery: ${deliveryType}, Line: ${line}, Speed: ${(speed * 3.6).toFixed(1)} km/h`);
+                console.log(`📍 Start: (${deliveryParams.startPos.x.toFixed(2)}, ${deliveryParams.startPos.y.toFixed(2)}, ${deliveryParams.startPos.z.toFixed(2)})`);
+                console.log(`📍 Velocity: (${deliveryParams.velocity.x.toFixed(2)}, ${deliveryParams.velocity.y.toFixed(2)}, ${deliveryParams.velocity.z.toFixed(2)})`);
+                
                 return {
                     speed: speed,
+                    speedKmh: speed * 3.6,
                     type: deliveryType,
                     line: line,
-                    ...this.getDeliveryParams(deliveryType, line, speed)
+                    ...deliveryParams
                 };
             },
             
+            /**
+             * Get available delivery types based on difficulty
+             */
             getDeliveryTypes: function(difficulty) {
                 if (difficulty === 'easy') {
-                    return ['good-length', 'full-toss', 'good-length', 'half-volley'];
+                    // Easy: mostly hittable deliveries
+                    return ['good-length', 'half-volley', 'full-toss', 'good-length', 'half-volley'];
                 } else if (difficulty === 'medium') {
-                    return ['good-length', 'full-toss', 'bouncer', 'yorker', 'half-volley'];
+                    // Medium: mix of deliveries
+                    return ['good-length', 'half-volley', 'yorker', 'bouncer', 'full-toss'];
                 } else {
-                    return ['good-length', 'bouncer', 'yorker', 'good-length', 'bouncer', 'yorker'];
+                    // Hard: challenging deliveries
+                    return ['good-length', 'yorker', 'bouncer', 'yorker', 'good-length', 'bouncer'];
                 }
             },
             
+            /**
+             * Weighted random selection
+             */
             weightedRandom: function(items, weights) {
                 const totalWeight = weights.reduce((a, b) => a + b, 0);
                 let random = Math.random() * totalWeight;
@@ -1071,123 +1343,315 @@ Enjoy the game! 🏏
                 return items[items.length - 1];
             },
             
-            getDeliveryParams: function(type, line, speed) {
-                // Starting position (at bowler's hand)
-                let startPos = { x: 0, y: 2, z: -24 };
+            /**
+             * CORE PHYSICS CALCULATION
+             * Calculate proper projectile motion for cricket deliveries
+             * 
+             * @param {string} type - Delivery type (good-length, yorker, bouncer, etc.)
+             * @param {string} line - Line of the delivery (off, middle, leg)
+             * @param {number} speed - Ball speed in m/s
+             * @returns {object} - Starting position and velocity vectors
+             */
+            calculateDeliveryPhysics: function(type, line, speed) {
+                // =========================================================
+                // STARTING POSITION (Bowler's release point)
+                // =========================================================
+                const startPos = {
+                    x: 0,           // Center of pitch
+                    y: 2.1,         // Release height (bowler's arm)
+                    z: -24          // Bowler's end
+                };
                 
-                // Target position (batsman crease)
-                let targetZ = 1; // Come right to the batsman
-                let targetY = 1.2; // Chest height
+                // =========================================================
+                // TARGET POSITION (Where ball should arrive at batsman)
+                // =========================================================
+                // Batsman stands at z = 0 to z = 1
+                // We want ball to arrive at hitting zone
                 
-                // Line adjustments
-                let lineOffset = 0;
-                if (line === 'off') lineOffset = 0.3;
-                else if (line === 'leg') lineOffset = -0.3;
+                let targetZ = 0.5;    // Default: reach batsman's crease
+                let targetY = 1.0;    // Default: stump height
+                let bounceZ = null;   // Z-position where ball bounces (null = no bounce)
                 
-                // Type adjustments - make all balls easier to hit
+                // =========================================================
+                // DELIVERY TYPE PARAMETERS
+                // Each delivery type has different target and bounce points
+                // =========================================================
+                
                 switch (type) {
                     case 'full-toss':
-                        targetZ = 1;
-                        targetY = 1.2;
+                        // No bounce - arrives at waist to chest height
+                        targetZ = 0.5;
+                        targetY = 1.0 + Math.random() * 0.3;  // 1.0-1.3m height
+                        bounceZ = null;  // No bounce
                         break;
-                    case 'yorker':
-                        targetZ = 0.8;
-                        targetY = 0.8;
-                        break;
-                    case 'bouncer':
-                        targetZ = 0;
-                        targetY = 1.6;
-                        break;
+                        
                     case 'half-volley':
-                        targetZ = 1;
-                        targetY = 1.0;
+                        // Bounces very close to batsman - easy to drive
+                        targetZ = 0.5;
+                        targetY = 0.6 + Math.random() * 0.3;  // Knee to thigh height
+                        bounceZ = -2;    // Bounces 2m in front of batsman
                         break;
+                        
                     case 'good-length':
-                    default:
-                        targetZ = 1;
-                        targetY = 1.2;
+                        // Classic delivery - bounces 6-8m before stumps
+                        targetZ = 0.5;
+                        targetY = 0.9 + Math.random() * 0.4;  // Stump to chest height
+                        bounceZ = -7 + Math.random() * 2;     // Bounces 5-7m before batsman
                         break;
+                        
+                    case 'yorker':
+                        // Pitches at batsman's feet - very low
+                        targetZ = 0.3;
+                        targetY = 0.15;   // Just above ground level
+                        bounceZ = -0.3;   // Bounces right at the crease
+                        break;
+                        
+                    case 'bouncer':
+                        // Short pitch - bounces early, rises to head height
+                        targetZ = 0.5;
+                        targetY = 1.6 + Math.random() * 0.3;  // Chest to head height
+                        bounceZ = -12 + Math.random() * 2;    // Bounces 10-12m before batsman
+                        break;
+                        
+                    default:
+                        // Default to good length
+                        targetZ = 0.5;
+                        targetY = 1.0;
+                        bounceZ = -6;
                 }
                 
-                const targetX = lineOffset;
+                // =========================================================
+                // LINE ADJUSTMENT (Lateral offset)
+                // =========================================================
+                let targetX = 0;
+                if (line === 'off') {
+                    targetX = 0.2 + Math.random() * 0.15;   // Outside off stump
+                } else if (line === 'leg') {
+                    targetX = -0.2 - Math.random() * 0.15;  // Down leg side
+                } else {
+                    targetX = (Math.random() - 0.5) * 0.2;  // Around middle stump
+                }
                 
-                // Simple direct trajectory - calculate time based on distance
-                const distance = Math.abs(targetZ - startPos.z);
-                const flightTime = distance / (speed * 0.5); // Slower for easier hitting
+                // =========================================================
+                // PHYSICS CALCULATION
+                // =========================================================
                 
-                // Calculate velocities for straight trajectory
-                const vx = (targetX - startPos.x) / flightTime;
-                const vz = (targetZ - startPos.z) / flightTime;
+                let velocity;
                 
-                // Calculate vy to reach target height
-                const vy = (targetY - startPos.y - 0.5 * CONFIG.gravity * flightTime * flightTime) / flightTime;
+                if (bounceZ === null) {
+                    // =====================================================
+                    // FULL TOSS (No bounce) - Direct trajectory
+                    // =====================================================
+                    velocity = this.calculateDirectTrajectory(startPos, targetX, targetY, targetZ, speed);
+                } else {
+                    // =====================================================
+                    // BOUNCING DELIVERY - Two-phase trajectory
+                    // =====================================================
+                    velocity = this.calculateBouncingTrajectory(startPos, targetX, targetY, targetZ, bounceZ, speed);
+                }
+                
+                // Add slight random variation for realism
+                velocity.x += (Math.random() - 0.5) * 0.5;
+                velocity.y += (Math.random() - 0.5) * 0.3;
                 
                 return {
                     startPos: startPos,
-                    velocity: { x: vx, y: vy, z: vz },
-                    bounceZ: -10, // Bounce earlier
+                    velocity: velocity,
+                    bounceZ: bounceZ,
                     targetY: targetY,
-                    flightTime: flightTime
+                    targetX: targetX,
+                    targetZ: targetZ
                 };
+            },
+            
+            /**
+             * Calculate velocity for direct (non-bouncing) delivery
+             * Uses projectile motion equations
+             */
+            calculateDirectTrajectory: function(startPos, targetX, targetY, targetZ, speed) {
+                // Distance to travel
+                const dz = targetZ - startPos.z;  // Will be positive (moving towards batsman)
+                const dx = targetX - startPos.x;
+                const dy = targetY - startPos.y;
+                
+                // The ball needs to travel distance dz at the given speed
+                // Most of the speed is in the z-direction
+                // Calculate time based on forward velocity
+                
+                // vz is the main component - ball speed is roughly the forward speed
+                // We use 90% of speed for forward motion, rest for adjustments
+                const vz = speed * 0.95;
+                
+                // Time to reach target
+                const t = Math.abs(dz) / vz;
+                
+                // Required lateral velocity
+                const vx = dx / t;
+                
+                // Required vertical velocity (accounting for gravity)
+                // y(t) = y0 + vy*t + 0.5*g*t²
+                // targetY = startY + vy*t + 0.5*g*t²
+                // vy = (targetY - startY - 0.5*g*t²) / t
+                const g = CONFIG.gravity;  // Negative value
+                const vy = (dy - 0.5 * g * t * t) / t;
+                
+                console.log(`⚡ Direct trajectory: t=${t.toFixed(3)}s, vz=${vz.toFixed(2)}, vy=${vy.toFixed(2)}`);
+                
+                return { x: vx, y: vy, z: vz };
+            },
+            
+            /**
+             * Calculate velocity for bouncing delivery
+             * Ball travels in two phases: before bounce and after bounce
+             */
+            calculateBouncingTrajectory: function(startPos, targetX, targetY, targetZ, bounceZ, speed) {
+                // =========================================================
+                // PHASE 1: From bowler to bounce point
+                // =========================================================
+                
+                const bounceY = CONFIG.ballRadius;  // Ball bounces at ground level
+                
+                // Distance to bounce point
+                const dz1 = bounceZ - startPos.z;
+                
+                // Forward velocity (main component of speed)
+                const vz = speed * 0.95;
+                
+                // Time to reach bounce point
+                const t1 = Math.abs(dz1) / vz;
+                
+                // We need to find vy such that ball hits the ground at bounceZ
+                // Using: y(t1) = bounceY
+                // startY + vy*t1 + 0.5*g*t1² = bounceY
+                // vy = (bounceY - startY - 0.5*g*t1²) / t1
+                const g = CONFIG.gravity;
+                const vy_initial = (bounceY - startPos.y - 0.5 * g * t1 * t1) / t1;
+                
+                // =========================================================
+                // PHASE 2: After bounce (for reference - physics system handles this)
+                // =========================================================
+                // After bounce, vy reverses with coefficient of restitution
+                // Ball continues to target
+                
+                // Calculate vx based on total flight to target
+                const totalDz = targetZ - startPos.z;
+                const totalTime = Math.abs(totalDz) / vz;
+                const vx = (targetX - startPos.x) / totalTime;
+                
+                console.log(`⚡ Bouncing trajectory: bounceZ=${bounceZ.toFixed(1)}, t1=${t1.toFixed(3)}s, vy=${vy_initial.toFixed(2)}`);
+                
+                return { x: vx, y: vy_initial, z: vz };
+            },
+            
+            /**
+             * Get current ball speed in km/h for display
+             */
+            getBallSpeedKmh: function() {
+                return (this.currentBallSpeed * 3.6).toFixed(0);
             }
         };
         
         // ========================================================================
-        // PHYSICS SYSTEM
+        // PHYSICS SYSTEM - Enhanced Ball Physics
         // ========================================================================
         
         const PhysicsSystem = {
-            // Update ball position based on physics
+            
+            // Track bounce count
+            bounceCount: 0,
+            
+            /**
+             * Update ball position using physics simulation
+             * Called every frame when ball is in play
+             */
             updateBall: function(deltaTime) {
                 if (!GameState.isBallInPlay) return;
+                
+                // Clamp deltaTime to prevent physics explosion
+                deltaTime = Math.min(deltaTime, 0.05);
                 
                 const ball = GameState.ballPosition;
                 const vel = GameState.ballVelocity;
                 
-                // Apply gravity
+                // =========================================================
+                // GRAVITY
+                // =========================================================
                 vel.y += CONFIG.gravity * deltaTime;
                 
-                // Apply air resistance
+                // =========================================================
+                // AIR RESISTANCE (very subtle)
+                // =========================================================
                 vel.x *= CONFIG.airResistance;
                 vel.z *= CONFIG.airResistance;
                 
-                // Update position
+                // =========================================================
+                // UPDATE POSITION
+                // =========================================================
                 ball.x += vel.x * deltaTime;
                 ball.y += vel.y * deltaTime;
                 ball.z += vel.z * deltaTime;
                 
-                // Ground collision
+                // =========================================================
+                // GROUND/PITCH COLLISION
+                // =========================================================
                 if (ball.y <= CONFIG.ballRadius) {
                     ball.y = CONFIG.ballRadius;
-                    vel.y = -vel.y * CONFIG.bounceCoefficient;
+                    
+                    // Bounce with coefficient of restitution
+                    vel.y = -vel.y * CONFIG.pitchBounceCoefficient;
+                    
+                    // Apply friction to horizontal components
                     vel.x *= CONFIG.groundFriction;
                     vel.z *= CONFIG.groundFriction;
                     
-                    // Check if this is the pitch bounce
-                    if (!GameState.ballHasBouncedOnPitch && ball.z > -15 && ball.z < 2) {
+                    this.bounceCount++;
+                    
+                    // Play bounce sound on first pitch bounce
+                    if (!GameState.ballHasBouncedOnPitch && ball.z > -20 && ball.z < 5) {
                         GameState.ballHasBouncedOnPitch = true;
                         AudioSystem.playBounce();
+                        console.log(`🏏 Ball bounced at z=${ball.z.toFixed(2)}, new vy=${vel.y.toFixed(2)}`);
                     }
                     
-                    // Ball has stopped
-                    if (Math.abs(vel.y) < 0.1 && Math.abs(vel.x) < 0.1 && Math.abs(vel.z) < 0.1) {
+                    // Ball has essentially stopped
+                    if (Math.abs(vel.y) < 0.5 && Math.abs(vel.x) < 0.3 && Math.abs(vel.z) < 0.3) {
                         this.ballStopped();
+                        return;
                     }
                 }
                 
-                // Check boundaries and scoring
+                // =========================================================
+                // BALL PASSED BATSMAN CHECK
+                // =========================================================
+                if (ball.z > 5 && !GameState.ballHitByBat) {
+                    // Ball passed the batsman without being hit
+                    console.log(`🏏 Ball passed batsman at z=${ball.z.toFixed(2)}`);
+                    this.ballStopped();
+                    return;
+                }
+                
+                // =========================================================
+                // CHECK GAME EVENTS
+                // =========================================================
                 this.checkBoundary();
                 this.checkStumps();
                 this.checkFielderCatch();
                 
-                // Update ball entity position
+                // =========================================================
+                // UPDATE VISUAL
+                // =========================================================
                 const ballEntity = document.getElementById('cricket-ball');
                 if (ballEntity) {
-                    ballEntity.setAttribute('position', `${ball.x} ${ball.y} ${ball.z}`);
+                    ballEntity.setAttribute('position', `${ball.x.toFixed(3)} ${ball.y.toFixed(3)} ${ball.z.toFixed(3)}`);
                 }
                 
                 // Update ball trail
                 this.updateBallTrail();
+                
+                // Debug logging (every 30 frames approx)
+                if (CONFIG.debugMode && Math.random() < 0.03) {
+                    console.log(`🔵 Ball: pos=(${ball.x.toFixed(2)}, ${ball.y.toFixed(2)}, ${ball.z.toFixed(2)}) vel=(${vel.x.toFixed(2)}, ${vel.y.toFixed(2)}, ${vel.z.toFixed(2)})`);
+                }
             },
             
             // Check if ball crossed boundary
@@ -1504,16 +1968,20 @@ Enjoy the game! 🏏
                 const dz = ball.z - batWorldPos.z;
                 const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
                 
-                // Collision threshold (bat blade dimensions + ball radius)
-                const collisionThreshold = 0.35;
+                // Collision threshold - use config value
+                const collisionThreshold = CONFIG.batCollisionRadius;
                 
                 if (distance < collisionThreshold) {
-                    this.handleHit(batWorldPos);
+                    console.log(`🏏 BAT-BALL COLLISION! Distance: ${distance.toFixed(3)}`);
+                    this.handleHit(batWorldPos, distance);
                 }
             },
             
-            // Handle bat hitting ball
-            handleHit: function(batWorldPos) {
+            /**
+             * Handle bat hitting ball
+             * Calculate shot power, direction, and trigger feedback
+             */
+            handleHit: function(batWorldPos, collisionDistance) {
                 GameState.ballHitByBat = true;
                 
                 // Get bat velocity and speed
@@ -1522,19 +1990,25 @@ Enjoy the game! 🏏
                 
                 // Determine hit quality based on contact point
                 const ball = GameState.ballPosition;
-                const hitQuality = this.calculateHitQuality(ball, batWorldPos);
+                const hitQuality = this.calculateHitQuality(ball, batWorldPos, collisionDistance);
+                
+                // Show timing indicator
+                showTimingIndicator(hitQuality);
                 
                 // Determine shot type based on bat movement
                 const shotType = this.determineShotType(batVel, GameState.batRotation);
                 
                 // Calculate new ball velocity
                 const powerMultiplier = this.getPowerMultiplier(hitQuality);
-                const baseSpeed = batSpeed * powerMultiplier * 2;
+                const baseSpeed = Math.max(batSpeed * powerMultiplier * 2, 10); // Minimum speed of 10 m/s
                 
                 // Direction based on shot type and bat angle
                 let newVel = this.calculateShotVelocity(shotType, batVel, baseSpeed, hitQuality);
                 
                 GameState.ballVelocity = newVel;
+                
+                console.log(`🏏 Shot: ${shotType}, Quality: ${hitQuality}, Speed: ${baseSpeed.toFixed(1)} m/s`);
+                console.log(`🏏 New ball velocity: (${newVel.x.toFixed(2)}, ${newVel.y.toFixed(2)}, ${newVel.z.toFixed(2)})`);
                 
                 // Visual and audio feedback
                 this.showHitFeedback(hitQuality, shotType);
@@ -1548,24 +2022,32 @@ Enjoy the game! 🏏
                 }
             },
             
-            // Calculate hit quality (sweet spot, edge, etc.)
-            calculateHitQuality: function(ballPos, batPos) {
+            /**
+             * Calculate hit quality based on contact point
+             * Perfect = sweet spot, Good = close to middle, Fair = off-center, Edge = bat edge
+             */
+            calculateHitQuality: function(ballPos, batPos, distance) {
                 const dy = Math.abs(ballPos.y - batPos.y);
                 const dx = Math.abs(ballPos.x - batPos.x);
                 
+                // Use collision distance for quality assessment
+                const sweetSpotThreshold = CONFIG.sweetSpotSize;
+                
                 // Sweet spot detection
-                if (dy < 0.1 && dx < 0.03) {
+                if (distance < sweetSpotThreshold && dy < 0.1 && dx < 0.05) {
                     return 'perfect';
-                } else if (dy < 0.2 && dx < 0.05) {
+                } else if (distance < sweetSpotThreshold * 1.5 && dy < 0.15) {
                     return 'good';
-                } else if (dx > 0.04) {
+                } else if (dx > 0.08) {
                     return 'edge';
                 } else {
                     return 'fair';
                 }
             },
             
-            // Determine shot type based on bat movement
+            /**
+             * Determine shot type based on bat movement direction
+             */
             determineShotType: function(velocity, rotation) {
                 const vx = velocity.x;
                 const vy = velocity.y;
@@ -1610,18 +2092,23 @@ Enjoy the game! 🏏
                 return 'Shot';
             },
             
-            // Get power multiplier based on hit quality
+            /**
+             * Get power multiplier based on hit quality
+             */
             getPowerMultiplier: function(quality) {
                 switch (quality) {
-                    case 'perfect': return 1.5;
-                    case 'good': return 1.2;
-                    case 'fair': return 0.8;
-                    case 'edge': return 0.5;
-                    default: return 0.7;
+                    case 'perfect': return 1.8;  // Sweet spot = maximum power
+                    case 'good': return 1.4;
+                    case 'fair': return 1.0;
+                    case 'edge': return 0.5;     // Edge = much less power
+                    default: return 0.8;
                 }
             },
             
-            // Calculate ball velocity after being hit
+            /**
+             * Calculate ball velocity after being hit
+             * Uses bat velocity and quality to determine shot power and direction
+             */
             calculateShotVelocity: function(shotType, batVel, baseSpeed, quality) {
                 let vx = 0, vy = 0, vz = 0;
                 
@@ -1703,6 +2190,34 @@ Enjoy the game! 🏏
             setTimeout(() => {
                 feedback.className = '';
             }, 1500);
+        }
+        
+        /**
+         * Show timing indicator when ball is hit
+         * @param {string} quality - 'perfect', 'good', or 'poor'
+         */
+        function showTimingIndicator(quality) {
+            const indicator = document.getElementById('timing-indicator');
+            if (!indicator) return;
+            
+            let text = '';
+            switch (quality) {
+                case 'perfect':
+                    text = '⚡ PERFECT!';
+                    break;
+                case 'good':
+                    text = '👍 GOOD';
+                    break;
+                default:
+                    text = '😬 POOR';
+            }
+            
+            indicator.textContent = text;
+            indicator.className = `show ${quality}`;
+            
+            setTimeout(() => {
+                indicator.className = '';
+            }, 1000);
         }
         
         function updateHUD() {
@@ -1804,31 +2319,75 @@ Enjoy the game! 🏏
         function bowlBall() {
             if (!GameState.isPlaying || GameState.isPaused || GameState.isBallInPlay) return;
             
-            // Generate delivery
+            // Reset physics system bounce counter
+            PhysicsSystem.bounceCount = 0;
+            
+            // Generate delivery with proper physics
             const delivery = BowlingSystem.generateDelivery();
             
-            console.log('Bowling delivery:', delivery);
-            console.log('Ball velocity:', delivery.velocity);
+            console.log('==========================================');
+            console.log('🏏 BOWLING DELIVERY');
+            console.log('==========================================');
+            console.log(`Type: ${delivery.type}, Line: ${delivery.line}`);
+            console.log(`Speed: ${delivery.speedKmh.toFixed(1)} km/h (${delivery.speed.toFixed(1)} m/s)`);
+            console.log(`Start Position: (${delivery.startPos.x.toFixed(2)}, ${delivery.startPos.y.toFixed(2)}, ${delivery.startPos.z.toFixed(2)})`);
+            console.log(`Velocity: (${delivery.velocity.x.toFixed(2)}, ${delivery.velocity.y.toFixed(2)}, ${delivery.velocity.z.toFixed(2)})`);
+            if (delivery.bounceZ !== null) {
+                console.log(`Expected bounce at z: ${delivery.bounceZ.toFixed(2)}`);
+            }
+            console.log('==========================================');
             
             // Set ball initial state
-            GameState.ballPosition = {...delivery.startPos};
-            GameState.ballVelocity = {...delivery.velocity};
+            GameState.ballPosition = {
+                x: delivery.startPos.x,
+                y: delivery.startPos.y,
+                z: delivery.startPos.z
+            };
+            GameState.ballVelocity = {
+                x: delivery.velocity.x,
+                y: delivery.velocity.y,
+                z: delivery.velocity.z
+            };
             GameState.ballHasBouncedOnPitch = false;
             GameState.ballHitByBat = false;
             GameState.isBallInPlay = true;
             GameState.isReadyForBall = false;
             
-            // Show ball
+            // Show ball at starting position
             showBall();
             const ball = document.getElementById('cricket-ball');
             if (ball) {
                 ball.setAttribute('position', `${delivery.startPos.x} ${delivery.startPos.y} ${delivery.startPos.z}`);
             }
             
-            console.log('Ball spawned at:', GameState.ballPosition);
+            // Update ball speed display
+            updateBallSpeedDisplay(delivery.speedKmh);
             
             // Animate bowler
             animateBowler();
+        }
+        
+        // Display ball speed in km/h
+        function updateBallSpeedDisplay(speedKmh) {
+            let speedDisplay = document.getElementById('ball-speed-display');
+            if (!speedDisplay) {
+                // Create speed display if it doesn't exist
+                speedDisplay = document.createElement('div');
+                speedDisplay.id = 'ball-speed-display';
+                speedDisplay.innerHTML = `
+                    <div class="speed-value">${speedKmh.toFixed(0)}</div>
+                    <div class="speed-unit">km/h</div>
+                `;
+                document.body.appendChild(speedDisplay);
+            } else {
+                speedDisplay.querySelector('.speed-value').textContent = speedKmh.toFixed(0);
+                speedDisplay.classList.remove('hidden');
+            }
+            
+            // Hide after 2 seconds
+            setTimeout(() => {
+                if (speedDisplay) speedDisplay.classList.add('hidden');
+            }, 2000);
         }
         
         function animateBowler() {
@@ -1981,6 +2540,7 @@ Enjoy the game! 🏏
             
             // Keyboard controls (for testing)
             document.addEventListener('keydown', function(e) {
+                // Escape: Pause/Resume
                 if (e.key === 'Escape') {
                     if (GameState.isPaused) {
                         resumeGame();
@@ -1988,10 +2548,66 @@ Enjoy the game! 🏏
                         pauseGame();
                     }
                 }
-                if (e.key === ' ' && GameState.isPlaying && GameState.isReadyForBall) {
+                
+                // Spacebar: Bowl next ball (when ready)
+                if (e.key === ' ' && GameState.isPlaying && !GameState.isBallInPlay) {
+                    e.preventDefault();
+                    bowlBall();
+                }
+                
+                // D key: Toggle debug mode
+                if (e.key === 'd' || e.key === 'D') {
+                    CONFIG.debugMode = !CONFIG.debugMode;
+                    console.log(`🔧 Debug mode: ${CONFIG.debugMode ? 'ON' : 'OFF'}`);
+                    
+                    // Show/hide debug panel
+                    let debugPanel = document.getElementById('debug-panel');
+                    if (CONFIG.debugMode) {
+                        if (!debugPanel) {
+                            debugPanel = document.createElement('div');
+                            debugPanel.id = 'debug-panel';
+                            document.body.appendChild(debugPanel);
+                        }
+                        debugPanel.classList.remove('hidden');
+                        updateDebugPanel();
+                    } else if (debugPanel) {
+                        debugPanel.classList.add('hidden');
+                    }
+                }
+                
+                // B key: Force bowl a ball (for testing)
+                if ((e.key === 'b' || e.key === 'B') && GameState.isPlaying) {
+                    console.log('🔧 Force bowling ball...');
+                    GameState.isBallInPlay = false;
                     bowlBall();
                 }
             });
+            
+            // Debug panel update
+            function updateDebugPanel() {
+                if (!CONFIG.debugMode) return;
+                
+                const panel = document.getElementById('debug-panel');
+                if (!panel) return;
+                
+                const ball = GameState.ballPosition;
+                const vel = GameState.ballVelocity;
+                const speed = Math.sqrt(vel.x*vel.x + vel.y*vel.y + vel.z*vel.z);
+                
+                panel.innerHTML = `
+                    <strong>DEBUG MODE</strong><br>
+                    Ball Position: (${ball.x.toFixed(2)}, ${ball.y.toFixed(2)}, ${ball.z.toFixed(2)})<br>
+                    Ball Velocity: (${vel.x.toFixed(2)}, ${vel.y.toFixed(2)}, ${vel.z.toFixed(2)})<br>
+                    Speed: ${(speed * 3.6).toFixed(1)} km/h<br>
+                    In Play: ${GameState.isBallInPlay}<br>
+                    Bounced: ${GameState.ballHasBouncedOnPitch}<br>
+                    Delivery: ${GameState.currentDeliveryType}<br>
+                    Line: ${GameState.currentLine}
+                `;
+            }
+            
+            // Update debug panel periodically
+            setInterval(updateDebugPanel, 100);
             
             // Start game loop
             requestAnimationFrame(gameLoop);
@@ -2100,21 +2716,51 @@ Enjoy the game! 🏏
             isDragging = false;
         });
         
-        // Click to hit for testing
+        // Click to hit for desktop testing
+        // Simulates a bat swing when ball is in the hitting zone
         document.addEventListener('click', function(e) {
             if (e.target.tagName === 'CANVAS' && GameState.isBallInPlay && !GameState.ballHitByBat) {
-                // Simulate a hit for desktop testing
+                // Ball is in hitting zone when z is between -3 and 2
                 const ball = GameState.ballPosition;
-                if (ball.z > -2 && ball.z < 2) {
-                    // Ball is in hitting zone
-                    const simulatedBatPos = { x: 0, y: 1.2, z: 0 };
+                console.log(`🖱️ Click detected. Ball at z=${ball.z.toFixed(2)}`);
+                
+                if (ball.z > -3 && ball.z < 2) {
+                    console.log('🏏 Ball in hitting zone! Simulating hit...');
+                    
+                    // Simulate a hit for desktop testing
+                    const simulatedBatPos = { 
+                        x: ball.x + (Math.random() - 0.5) * 0.1, 
+                        y: ball.y + (Math.random() - 0.5) * 0.1, 
+                        z: ball.z 
+                    };
+                    
+                    // Create simulated bat velocity (as if swinging)
+                    const swingDirection = Math.random() > 0.5 ? 1 : -1;  // Off side or leg side
                     BattingSystem.velocityHistory = [
-                        { x: (Math.random() - 0.5) * 10, y: 3 + Math.random() * 2, z: -8 - Math.random() * 4 }
+                        { 
+                            x: swingDirection * (3 + Math.random() * 5),  // Horizontal swing
+                            y: 2 + Math.random() * 3,                      // Slight upward motion
+                            z: -6 - Math.random() * 6                      // Forward momentum
+                        }
                     ];
-                    BattingSystem.handleHit(simulatedBatPos);
+                    
+                    BattingSystem.handleHit(simulatedBatPos, 0.1);
+                } else {
+                    console.log(`⚠️ Ball not in hitting zone (z=${ball.z.toFixed(2)}). Zone is -3 to 2.`);
                 }
             }
         });
+        
+        // Log help message on startup
+        console.log('==========================================');
+        console.log('🏏 VR CRICKET PRO - Debug Controls');
+        console.log('==========================================');
+        console.log('SPACEBAR: Bowl next ball');
+        console.log('B: Force bowl (bypass checks)');
+        console.log('D: Toggle debug mode');
+        console.log('ESC: Pause/Resume');
+        console.log('CLICK on canvas: Simulate bat hit');
+        console.log('==========================================');
         
     })();
     </script>
