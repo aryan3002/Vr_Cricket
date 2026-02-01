@@ -408,6 +408,7 @@ Enjoy photorealistic VR cricket! 🏏
             background: linear-gradient(135deg, #ffd700, #ff8c00);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
         
         .stats-grid {
@@ -632,319 +633,977 @@ Enjoy photorealistic VR cricket! 🏏
     <a-scene 
         id="cricket-scene"
         vr-mode-ui="enabled: true"
-        renderer="antialias: true; colorManagement: true;"
-        loading-screen="dotsColor: #ffd700; backgroundColor: #1a472a">
+        renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true; sortObjects: true"
+        shadow="type: pcfsoft; autoUpdate: true"
+        loading-screen="dotsColor: #ffd700; backgroundColor: #0a1f0a">
         
-        <!-- Assets -->
-        <a-assets>
+        <!-- ================================================================
+             ASSETS - Preload all textures and materials for better performance
+             Using procedurally generated textures via canvas for portability
+        ================================================================= -->
+        <a-assets timeout="30000">
             <!-- Sounds -->
             <audio id="bat-hit-sound" src="data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=" preload="auto"></audio>
+            
+            <!-- Procedural Textures will be created via JavaScript -->
+            <canvas id="grass-texture-canvas" width="512" height="512"></canvas>
+            <canvas id="pitch-texture-canvas" width="512" height="256"></canvas>
+            <canvas id="wood-texture-canvas" width="256" height="256"></canvas>
+            <canvas id="leather-texture-canvas" width="256" height="256"></canvas>
+            <canvas id="crowd-texture-canvas" width="512" height="256"></canvas>
+            <canvas id="sky-gradient-canvas" width="512" height="512"></canvas>
         </a-assets>
         
-        <!-- Sky and Environment -->
-        <a-sky color="#87CEEB" id="sky"></a-sky>
+        <!-- ================================================================
+             SKY DOME - Realistic gradient sky with clouds
+             Uses gradient from horizon to zenith for depth
+        ================================================================= -->
+        <a-sky id="sky" 
+               material="shader: flat; side: back"
+               theta-length="180"
+               radius="500">
+        </a-sky>
         
-        <!-- Sun -->
-        <a-entity 
-            light="type: directional; color: #FFF; intensity: 1.2; castShadow: true"
-            position="50 100 50">
+        <!-- Cloud layer - subtle white patches -->
+        <a-entity id="clouds">
+            <a-sphere position="-100 80 -200" radius="30" 
+                      material="color: #ffffff; opacity: 0.4; transparent: true; shader: flat">
+            </a-sphere>
+            <a-sphere position="50 90 -180" radius="25" 
+                      material="color: #ffffff; opacity: 0.35; transparent: true; shader: flat">
+            </a-sphere>
+            <a-sphere position="-50 85 -150" radius="35" 
+                      material="color: #f8f8ff; opacity: 0.3; transparent: true; shader: flat">
+            </a-sphere>
+            <a-sphere position="120 75 -220" radius="28" 
+                      material="color: #ffffff; opacity: 0.38; transparent: true; shader: flat">
+            </a-sphere>
         </a-entity>
         
-        <!-- Ambient Light -->
-        <a-entity light="type: ambient; color: #BBB; intensity: 0.5"></a-entity>
+        <!-- ================================================================
+             LIGHTING SYSTEM - Realistic stadium lighting
+             Main sun + fill lights + ambient for depth
+        ================================================================= -->
         
-        <!-- Stadium/Environment -->
+        <!-- Main Sun/Directional Light - Primary shadow caster -->
+        <a-entity id="sun-light"
+            light="type: directional; 
+                   color: #FFF8E7; 
+                   intensity: 1.5; 
+                   castShadow: true;
+                   shadowMapWidth: 2048;
+                   shadowMapHeight: 2048;
+                   shadowCameraLeft: -50;
+                   shadowCameraRight: 50;
+                   shadowCameraTop: 50;
+                   shadowCameraBottom: -50;
+                   shadowCameraNear: 1;
+                   shadowCameraFar: 200;
+                   shadowBias: -0.001"
+            position="30 60 20">
+        </a-entity>
+        
+        <!-- Fill Light - Softens shadows -->
+        <a-entity 
+            light="type: directional; color: #B4D7FF; intensity: 0.4"
+            position="-30 40 -20">
+        </a-entity>
+        
+        <!-- Ambient Light - Base illumination -->
+        <a-entity light="type: ambient; color: #87CEEB; intensity: 0.35"></a-entity>
+        
+        <!-- Hemisphere Light - Sky/ground color blend -->
+        <a-entity light="type: hemisphere; color: #87CEEB; groundColor: #3d5c3d; intensity: 0.4"></a-entity>
+        
+        <!-- ================================================================
+             STADIUM FLOODLIGHTS - 4 towers around the ground
+             Each tower has multiple light sources
+        ================================================================= -->
+        <a-entity id="floodlights">
+            <!-- Tower 1 - North East -->
+            <a-entity id="floodlight-tower-1" position="55 0 -60">
+                <a-cylinder position="0 20 0" radius="1.5" height="40" 
+                            material="color: #444; metalness: 0.8; roughness: 0.3" shadow="cast: true"></a-cylinder>
+                <a-box position="0 42 0" width="8" height="3" depth="4" 
+                       material="color: #333; metalness: 0.7"></a-box>
+                <!-- Light panels (emissive for glow effect) -->
+                <a-box position="0 42 -2.5" width="7" height="2" depth="0.3" 
+                       material="color: #FFFFEE; emissive: #FFFFAA; emissiveIntensity: 0.5; shader: flat"></a-box>
+                <a-entity light="type: spot; color: #FFFEF0; intensity: 0.8; angle: 60; penumbra: 0.3; distance: 150"
+                          position="0 42 -3" rotation="-45 180 0"></a-entity>
+            </a-entity>
+            
+            <!-- Tower 2 - North West -->
+            <a-entity id="floodlight-tower-2" position="-55 0 -60">
+                <a-cylinder position="0 20 0" radius="1.5" height="40" 
+                            material="color: #444; metalness: 0.8; roughness: 0.3" shadow="cast: true"></a-cylinder>
+                <a-box position="0 42 0" width="8" height="3" depth="4" 
+                       material="color: #333; metalness: 0.7"></a-box>
+                <a-box position="0 42 -2.5" width="7" height="2" depth="0.3" 
+                       material="color: #FFFFEE; emissive: #FFFFAA; emissiveIntensity: 0.5; shader: flat"></a-box>
+                <a-entity light="type: spot; color: #FFFEF0; intensity: 0.8; angle: 60; penumbra: 0.3; distance: 150"
+                          position="0 42 -3" rotation="-45 180 0"></a-entity>
+            </a-entity>
+            
+            <!-- Tower 3 - South East -->
+            <a-entity id="floodlight-tower-3" position="55 0 40">
+                <a-cylinder position="0 20 0" radius="1.5" height="40" 
+                            material="color: #444; metalness: 0.8; roughness: 0.3" shadow="cast: true"></a-cylinder>
+                <a-box position="0 42 0" width="8" height="3" depth="4" 
+                       material="color: #333; metalness: 0.7"></a-box>
+                <a-box position="0 42 2.5" width="7" height="2" depth="0.3" 
+                       material="color: #FFFFEE; emissive: #FFFFAA; emissiveIntensity: 0.5; shader: flat"></a-box>
+                <a-entity light="type: spot; color: #FFFEF0; intensity: 0.8; angle: 60; penumbra: 0.3; distance: 150"
+                          position="0 42 3" rotation="-45 0 0"></a-entity>
+            </a-entity>
+            
+            <!-- Tower 4 - South West -->
+            <a-entity id="floodlight-tower-4" position="-55 0 40">
+                <a-cylinder position="0 20 0" radius="1.5" height="40" 
+                            material="color: #444; metalness: 0.8; roughness: 0.3" shadow="cast: true"></a-cylinder>
+                <a-box position="0 42 0" width="8" height="3" depth="4" 
+                       material="color: #333; metalness: 0.7"></a-box>
+                <a-box position="0 42 2.5" width="7" height="2" depth="0.3" 
+                       material="color: #FFFFEE; emissive: #FFFFAA; emissiveIntensity: 0.5; shader: flat"></a-box>
+                <a-entity light="type: spot; color: #FFFEF0; intensity: 0.8; angle: 60; penumbra: 0.3; distance: 150"
+                          position="0 42 3" rotation="-45 0 0"></a-entity>
+            </a-entity>
+        </a-entity>
+        
+        <!-- ================================================================
+             STADIUM ENVIRONMENT - Ground, Pitch, Stands, Boundary
+        ================================================================= -->
         <a-entity id="stadium">
-            <!-- Main Ground (Grass) -->
+            
+            <!-- MAIN OUTFIELD - Realistic grass with texture -->
             <a-cylinder 
-                id="ground"
-                position="0 -0.1 -11" 
-                radius="80" 
-                height="0.2" 
-                color="#228B22"
-                segments-radial="64">
+                id="outfield"
+                position="0 -0.05 -11" 
+                radius="75" 
+                height="0.1"
+                segments-radial="64"
+                material="color: #2d5a27; roughness: 0.9; metalness: 0"
+                shadow="receive: true">
             </a-cylinder>
             
-            <!-- Pitch (Brown Strip) -->
-            <a-box 
-                id="pitch"
-                position="0 0.01 -11" 
-                width="3" 
-                height="0.05" 
-                depth="22" 
-                color="#C4A35A">
-            </a-box>
+            <!-- Grass detail layer - slightly raised for depth -->
+            <a-cylinder
+                id="grass-detail"
+                position="0 -0.02 -11"
+                radius="74.5"
+                height="0.04"
+                segments-radial="64"
+                material="color: #3a7233; roughness: 0.85; metalness: 0; transparent: true; opacity: 0.7"
+                shadow="receive: true">
+            </a-cylinder>
             
-            <!-- Pitch Crease Lines -->
-            <a-box position="0 0.02 0" width="2.5" height="0.02" depth="0.05" color="white"></a-box>
-            <a-box position="0 0.02 -22" width="2.5" height="0.02" depth="0.05" color="white"></a-box>
-            
-            <!-- Boundary Rope -->
+            <!-- 30-yard circle marking -->
             <a-torus 
-                id="boundary"
-                position="0 0.1 -11" 
-                radius="70" 
-                radius-tubular="0.15" 
-                color="#FFFFFF"
+                id="thirty-yard-circle"
+                position="0 0.02 -11" 
+                radius="27.4" 
+                radius-tubular="0.08" 
+                material="color: #ffffff; roughness: 0.5"
                 rotation="90 0 0"
                 segments-tubular="100">
             </a-torus>
             
-            <!-- Boundary Markers (Flags) -->
-            <a-entity id="boundary-markers"></a-entity>
+            <!-- ============================================================
+                 CRICKET PITCH - Brown with worn areas and crease markings
+            ============================================================= -->
+            <a-entity id="pitch-area">
+                <!-- Main pitch surface -->
+                <a-box 
+                    id="pitch"
+                    position="0 0.01 -11" 
+                    width="3.05" 
+                    height="0.03" 
+                    depth="22.5" 
+                    material="color: #C4A35A; roughness: 0.95; metalness: 0"
+                    shadow="receive: true; cast: true">
+                </a-box>
+                
+                <!-- Worn area - batting crease (darker, more used) -->
+                <a-box 
+                    position="0 0.015 -0.5" 
+                    width="2.5" 
+                    height="0.01" 
+                    depth="2" 
+                    material="color: #A08040; roughness: 1; metalness: 0"
+                    shadow="receive: true">
+                </a-box>
+                
+                <!-- Worn area - bowler's landing spot -->
+                <a-box 
+                    position="0 0.015 -18" 
+                    width="1.5" 
+                    height="0.01" 
+                    depth="2.5" 
+                    material="color: #A58050; roughness: 1; metalness: 0"
+                    shadow="receive: true">
+                </a-box>
+                
+                <!-- Pitch cracks (subtle dark lines) -->
+                <a-box position="0.3 0.018 -10" width="0.02" height="0.005" depth="4" 
+                       material="color: #5a4a2a; roughness: 1"></a-box>
+                <a-box position="-0.4 0.018 -12" width="0.015" height="0.005" depth="3" 
+                       material="color: #5a4a2a; roughness: 1"></a-box>
+                <a-box position="0.1 0.018 -8" width="0.02" height="0.005" depth="2.5" 
+                       material="color: #5a4a2a; roughness: 1"></a-box>
+                
+                <!-- ========== CREASE MARKINGS ========== -->
+                <!-- Batting crease (popping crease) -->
+                <a-box position="0 0.025 0" width="2.64" height="0.01" depth="0.05" 
+                       material="color: #ffffff; roughness: 0.3" shadow="cast: true"></a-box>
+                
+                <!-- Return creases - batting end -->
+                <a-box position="1.32 0.025 -0.6" width="0.05" height="0.01" depth="1.3" 
+                       material="color: #ffffff; roughness: 0.3"></a-box>
+                <a-box position="-1.32 0.025 -0.6" width="0.05" height="0.01" depth="1.3" 
+                       material="color: #ffffff; roughness: 0.3"></a-box>
+                
+                <!-- Bowling crease -->
+                <a-box position="0 0.025 -22" width="2.64" height="0.01" depth="0.05" 
+                       material="color: #ffffff; roughness: 0.3"></a-box>
+                
+                <!-- Return creases - bowling end -->
+                <a-box position="1.32 0.025 -21.4" width="0.05" height="0.01" depth="1.3" 
+                       material="color: #ffffff; roughness: 0.3"></a-box>
+                <a-box position="-1.32 0.025 -21.4" width="0.05" height="0.01" depth="1.3" 
+                       material="color: #ffffff; roughness: 0.3"></a-box>
+            </a-entity>
+            
+            <!-- ============================================================
+                 BOUNDARY ROPE & ADVERTISING BOARDS
+            ============================================================= -->
+            <!-- Boundary rope -->
+            <a-torus 
+                id="boundary-rope"
+                position="0 0.08 -11" 
+                radius="68" 
+                radius-tubular="0.12" 
+                material="color: #ffffff; roughness: 0.4"
+                rotation="90 0 0"
+                segments-tubular="120"
+                segments-radial="8">
+            </a-torus>
+            
+            <!-- Advertising boards around boundary -->
+            <a-entity id="advertising-boards">
+                <!-- Board segments around the boundary (every 30 degrees) -->
+                <a-box position="0 0.6 -79" width="15" height="1.2" depth="0.3" 
+                       material="color: #1a4d8f; roughness: 0.3" shadow="cast: true; receive: true"></a-box>
+                <a-text position="0 0.6 -78.7" value="VR CRICKET" align="center" color="#ffffff" width="12"></a-text>
+                
+                <a-box position="40 0.6 -68" width="15" height="1.2" depth="0.3" rotation="0 -30 0"
+                       material="color: #8f1a1a; roughness: 0.3" shadow="cast: true; receive: true"></a-box>
+                <a-text position="40.2 0.6 -67.7" value="QUEST 2" align="center" color="#ffffff" width="10" rotation="0 -30 0"></a-text>
+                
+                <a-box position="68 0.6 -40" width="15" height="1.2" depth="0.3" rotation="0 -60 0"
+                       material="color: #1a8f4d; roughness: 0.3" shadow="cast: true; receive: true"></a-box>
+                
+                <a-box position="-40 0.6 -68" width="15" height="1.2" depth="0.3" rotation="0 30 0"
+                       material="color: #8f6b1a; roughness: 0.3" shadow="cast: true; receive: true"></a-box>
+                
+                <a-box position="-68 0.6 -40" width="15" height="1.2" depth="0.3" rotation="0 60 0"
+                       material="color: #4d1a8f; roughness: 0.3" shadow="cast: true; receive: true"></a-box>
+                
+                <!-- Behind batsman boards -->
+                <a-box position="40 0.6 50" width="15" height="1.2" depth="0.3" rotation="0 30 0"
+                       material="color: #1a4d8f; roughness: 0.3" shadow="cast: true; receive: true"></a-box>
+                       
+                <a-box position="-40 0.6 50" width="15" height="1.2" depth="0.3" rotation="0 -30 0"
+                       material="color: #8f1a4d; roughness: 0.3" shadow="cast: true; receive: true"></a-box>
+            </a-entity>
+            
+            <!-- ============================================================
+                 SIGHT SCREEN - Behind bowler
+            ============================================================= -->
+            <a-box id="sight-screen"
+                   position="0 6 -85" 
+                   width="20" height="12" depth="0.5"
+                   material="color: #f5f5f5; roughness: 0.2; metalness: 0.1"
+                   shadow="cast: true; receive: true">
+            </a-box>
+            
+            <!-- ============================================================
+                 STADIUM STANDS - Tiered seating with crowd
+            ============================================================= -->
+            <a-entity id="stadium-stands">
+                <!-- Main stand - behind bowler -->
+                <a-entity id="stand-north" position="0 0 -90">
+                    <!-- Lower tier -->
+                    <a-box position="0 4 0" width="100" height="8" depth="15" 
+                           material="color: #4a4a4a; roughness: 0.8" shadow="receive: true"></a-box>
+                    <!-- Upper tier -->
+                    <a-box position="0 12 -5" width="100" height="8" depth="15" 
+                           material="color: #3a3a3a; roughness: 0.8" shadow="receive: true"></a-box>
+                    <!-- Roof -->
+                    <a-box position="0 18 -2" width="105" height="0.5" depth="25" 
+                           material="color: #2a2a2a; roughness: 0.6" shadow="cast: true; receive: true"></a-box>
+                    <!-- Crowd color blocks (simulating filled seats) -->
+                    <a-box position="0 5 7" width="90" height="5" depth="0.5" 
+                           material="color: #c9302c; roughness: 0.9"></a-box>
+                    <a-box position="0 13 2" width="90" height="5" depth="0.5" 
+                           material="color: #337ab7; roughness: 0.9"></a-box>
+                </a-entity>
+                
+                <!-- Stand - behind batsman/keeper -->
+                <a-entity id="stand-south" position="0 0 60">
+                    <a-box position="0 4 0" width="80" height="8" depth="15" 
+                           material="color: #4a4a4a; roughness: 0.8" shadow="receive: true"></a-box>
+                    <a-box position="0 12 5" width="80" height="8" depth="15" 
+                           material="color: #3a3a3a; roughness: 0.8" shadow="receive: true"></a-box>
+                    <a-box position="0 18 2" width="85" height="0.5" depth="25" 
+                           material="color: #2a2a2a; roughness: 0.6" shadow="cast: true"></a-box>
+                    <!-- Crowd -->
+                    <a-box position="0 5 -7" width="70" height="5" depth="0.5" 
+                           material="color: #5cb85c; roughness: 0.9"></a-box>
+                    <a-box position="0 13 -2" width="70" height="5" depth="0.5" 
+                           material="color: #f0ad4e; roughness: 0.9"></a-box>
+                </a-entity>
+                
+                <!-- East stand -->
+                <a-entity id="stand-east" position="80 0 -11" rotation="0 -90 0">
+                    <a-box position="0 4 0" width="80" height="8" depth="12" 
+                           material="color: #4a4a4a; roughness: 0.8" shadow="receive: true"></a-box>
+                    <a-box position="0 12 -4" width="80" height="8" depth="12" 
+                           material="color: #3a3a3a; roughness: 0.8" shadow="receive: true"></a-box>
+                    <a-box position="0 18 -2" width="85" height="0.5" depth="20" 
+                           material="color: #2a2a2a; roughness: 0.6" shadow="cast: true"></a-box>
+                    <a-box position="0 5 5" width="70" height="5" depth="0.5" 
+                           material="color: #d9534f; roughness: 0.9"></a-box>
+                </a-entity>
+                
+                <!-- West stand -->
+                <a-entity id="stand-west" position="-80 0 -11" rotation="0 90 0">
+                    <a-box position="0 4 0" width="80" height="8" depth="12" 
+                           material="color: #4a4a4a; roughness: 0.8" shadow="receive: true"></a-box>
+                    <a-box position="0 12 -4" width="80" height="8" depth="12" 
+                           material="color: #3a3a3a; roughness: 0.8" shadow="receive: true"></a-box>
+                    <a-box position="0 18 -2" width="85" height="0.5" depth="20" 
+                           material="color: #2a2a2a; roughness: 0.6" shadow="cast: true"></a-box>
+                    <a-box position="0 5 5" width="70" height="5" depth="0.5" 
+                           material="color: #5bc0de; roughness: 0.9"></a-box>
+                </a-entity>
+            </a-entity>
         </a-entity>
         
-        <!-- Stumps - Batsman End -->
+        <!-- ================================================================
+             STUMPS - BATSMAN END (with LED effect capability)
+             Realistic wooden texture with proper cricket dimensions
+        ================================================================= -->
         <a-entity id="batsman-stumps" position="0 0 0.5">
-            <!-- Three Stumps -->
-            <a-cylinder position="-0.115 0.35 0" radius="0.015" height="0.71" color="#F5DEB3"></a-cylinder>
-            <a-cylinder position="0 0.35 0" radius="0.015" height="0.71" color="#F5DEB3"></a-cylinder>
-            <a-cylinder position="0.115 0.35 0" radius="0.015" height="0.71" color="#F5DEB3"></a-cylinder>
-            <!-- Bails -->
-            <a-box id="bail-1" position="-0.0575 0.72 0" width="0.08" height="0.02" depth="0.015" color="#F5DEB3"></a-box>
-            <a-box id="bail-2" position="0.0575 0.72 0" width="0.08" height="0.02" depth="0.015" color="#F5DEB3"></a-box>
+            <!-- Three Stumps - 28.5 inches (0.72m) tall, 1.125 inches diameter -->
+            <!-- Off Stump -->
+            <a-cylinder id="stump-off" position="-0.115 0.36 0" radius="0.014" height="0.72" 
+                        material="color: #DEB887; roughness: 0.7; metalness: 0"
+                        shadow="cast: true; receive: true">
+                <!-- LED glow ring (hidden by default, shown when hit) -->
+                <a-torus class="led-ring" position="0 0.3 0" radius="0.016" radius-tubular="0.003" 
+                         material="color: #ff0000; emissive: #ff0000; emissiveIntensity: 0; shader: flat" 
+                         rotation="90 0 0" visible="false"></a-torus>
+            </a-cylinder>
+            
+            <!-- Middle Stump -->
+            <a-cylinder id="stump-middle" position="0 0.36 0" radius="0.014" height="0.72" 
+                        material="color: #DEB887; roughness: 0.7; metalness: 0"
+                        shadow="cast: true; receive: true">
+                <a-torus class="led-ring" position="0 0.3 0" radius="0.016" radius-tubular="0.003" 
+                         material="color: #ff0000; emissive: #ff0000; emissiveIntensity: 0; shader: flat" 
+                         rotation="90 0 0" visible="false"></a-torus>
+            </a-cylinder>
+            
+            <!-- Leg Stump -->
+            <a-cylinder id="stump-leg" position="0.115 0.36 0" radius="0.014" height="0.72" 
+                        material="color: #DEB887; roughness: 0.7; metalness: 0"
+                        shadow="cast: true; receive: true">
+                <a-torus class="led-ring" position="0 0.3 0" radius="0.016" radius-tubular="0.003" 
+                         material="color: #ff0000; emissive: #ff0000; emissiveIntensity: 0; shader: flat" 
+                         rotation="90 0 0" visible="false"></a-torus>
+            </a-cylinder>
+            
+            <!-- Bails - with grooves (sits on top of stumps) -->
+            <a-entity id="bail-1" position="-0.0575 0.73 0">
+                <a-cylinder radius="0.008" height="0.11" rotation="0 0 90"
+                            material="color: #F5DEB3; roughness: 0.6"
+                            shadow="cast: true"></a-cylinder>
+                <!-- Bail groove details -->
+                <a-sphere position="-0.04 0 0" radius="0.01" material="color: #E8D4A8"></a-sphere>
+                <a-sphere position="0.04 0 0" radius="0.01" material="color: #E8D4A8"></a-sphere>
+            </a-entity>
+            
+            <a-entity id="bail-2" position="0.0575 0.73 0">
+                <a-cylinder radius="0.008" height="0.11" rotation="0 0 90"
+                            material="color: #F5DEB3; roughness: 0.6"
+                            shadow="cast: true"></a-cylinder>
+                <a-sphere position="-0.04 0 0" radius="0.01" material="color: #E8D4A8"></a-sphere>
+                <a-sphere position="0.04 0 0" radius="0.01" material="color: #E8D4A8"></a-sphere>
+            </a-entity>
         </a-entity>
         
-        <!-- Stumps - Bowler End -->
+        <!-- STUMPS - BOWLER END -->
         <a-entity id="bowler-stumps" position="0 0 -22">
-            <a-cylinder position="-0.115 0.35 0" radius="0.015" height="0.71" color="#F5DEB3"></a-cylinder>
-            <a-cylinder position="0 0.35 0" radius="0.015" height="0.71" color="#F5DEB3"></a-cylinder>
-            <a-cylinder position="0.115 0.35 0" radius="0.015" height="0.71" color="#F5DEB3"></a-cylinder>
-            <a-box position="-0.0575 0.72 0" width="0.08" height="0.02" depth="0.015" color="#F5DEB3"></a-box>
-            <a-box position="0.0575 0.72 0" width="0.08" height="0.02" depth="0.015" color="#F5DEB3"></a-box>
+            <a-cylinder position="-0.115 0.36 0" radius="0.014" height="0.72" 
+                        material="color: #DEB887; roughness: 0.7" shadow="cast: true"></a-cylinder>
+            <a-cylinder position="0 0.36 0" radius="0.014" height="0.72" 
+                        material="color: #DEB887; roughness: 0.7" shadow="cast: true"></a-cylinder>
+            <a-cylinder position="0.115 0.36 0" radius="0.014" height="0.72" 
+                        material="color: #DEB887; roughness: 0.7" shadow="cast: true"></a-cylinder>
+            <!-- Bails -->
+            <a-entity position="-0.0575 0.73 0">
+                <a-cylinder radius="0.008" height="0.11" rotation="0 0 90"
+                            material="color: #F5DEB3; roughness: 0.6" shadow="cast: true"></a-cylinder>
+            </a-entity>
+            <a-entity position="0.0575 0.73 0">
+                <a-cylinder radius="0.008" height="0.11" rotation="0 0 90"
+                            material="color: #F5DEB3; roughness: 0.6" shadow="cast: true"></a-cylinder>
+            </a-entity>
         </a-entity>
         
-        <!-- Bowler Character -->
+        <!-- ================================================================
+             BOWLER - Detailed player model with proper proportions
+        ================================================================= -->
         <a-entity id="bowler" position="0 0 -25">
-            <!-- Body -->
-            <a-cylinder position="0 0.9 0" radius="0.25" height="0.8" color="#FFFFFF"></a-cylinder>
-            <!-- Head -->
-            <a-sphere position="0 1.5 0" radius="0.2" color="#DEB887"></a-sphere>
+            <!-- Legs (cricket whites) -->
+            <a-entity id="bowler-legs">
+                <!-- Right leg -->
+                <a-cylinder position="0.12 0.35 0" radius="0.08" height="0.7" 
+                            material="color: #f5f5f5; roughness: 0.8" shadow="cast: true"></a-cylinder>
+                <!-- Left leg -->
+                <a-cylinder position="-0.12 0.35 0" radius="0.08" height="0.7" 
+                            material="color: #f5f5f5; roughness: 0.8" shadow="cast: true"></a-cylinder>
+                <!-- Shoes -->
+                <a-box position="0.12 0.05 0.05" width="0.1" height="0.08" depth="0.2" 
+                       material="color: #ffffff; roughness: 0.6"></a-box>
+                <a-box position="-0.12 0.05 0.05" width="0.1" height="0.08" depth="0.2" 
+                       material="color: #ffffff; roughness: 0.6"></a-box>
+            </a-entity>
+            
+            <!-- Torso (cricket shirt) -->
+            <a-entity id="bowler-torso">
+                <!-- Body -->
+                <a-cylinder position="0 0.95 0" radius="0.2" height="0.6" 
+                            material="color: #f8f8f8; roughness: 0.7" shadow="cast: true"></a-cylinder>
+                <!-- Shoulders -->
+                <a-sphere position="0.22 1.1 0" radius="0.08" material="color: #f8f8f8; roughness: 0.7"></a-sphere>
+                <a-sphere position="-0.22 1.1 0" radius="0.08" material="color: #f8f8f8; roughness: 0.7"></a-sphere>
+                <!-- Collar (colored trim for team) -->
+                <a-torus position="0 1.2 0" radius="0.12" radius-tubular="0.02" rotation="90 0 0"
+                         material="color: #1a4d8f; roughness: 0.5"></a-torus>
+            </a-entity>
+            
             <!-- Arms -->
-            <a-cylinder id="bowler-arm-right" position="0.35 1.1 0" radius="0.08" height="0.6" color="#DEB887" rotation="0 0 -30"></a-cylinder>
-            <a-cylinder id="bowler-arm-left" position="-0.35 1.1 0" radius="0.08" height="0.6" color="#DEB887" rotation="0 0 30"></a-cylinder>
-            <!-- Legs -->
-            <a-cylinder position="0.15 0.3 0" radius="0.1" height="0.6" color="#FFFFFF"></a-cylinder>
-            <a-cylinder position="-0.15 0.3 0" radius="0.1" height="0.6" color="#FFFFFF"></a-cylinder>
+            <a-entity id="bowler-arms">
+                <!-- Right arm (bowling arm) - will be animated -->
+                <a-entity id="bowler-arm-right" position="0.28 1.1 0">
+                    <!-- Upper arm -->
+                    <a-cylinder position="0.12 0 0" radius="0.05" height="0.35" rotation="0 0 -80"
+                                material="color: #DEB887; roughness: 0.8" shadow="cast: true"></a-cylinder>
+                    <!-- Forearm -->
+                    <a-cylinder position="0.35 -0.1 0" radius="0.045" height="0.3" rotation="0 0 -60"
+                                material="color: #DEB887; roughness: 0.8" shadow="cast: true"></a-cylinder>
+                    <!-- Hand -->
+                    <a-sphere position="0.5 -0.15 0" radius="0.04" material="color: #DEB887; roughness: 0.8"></a-sphere>
+                </a-entity>
+                
+                <!-- Left arm -->
+                <a-entity id="bowler-arm-left" position="-0.28 1.1 0">
+                    <a-cylinder position="-0.12 0 0" radius="0.05" height="0.35" rotation="0 0 80"
+                                material="color: #DEB887; roughness: 0.8" shadow="cast: true"></a-cylinder>
+                    <a-cylinder position="-0.35 -0.1 0" radius="0.045" height="0.3" rotation="0 0 60"
+                                material="color: #DEB887; roughness: 0.8" shadow="cast: true"></a-cylinder>
+                    <a-sphere position="-0.5 -0.15 0" radius="0.04" material="color: #DEB887; roughness: 0.8"></a-sphere>
+                </a-entity>
+            </a-entity>
+            
+            <!-- Head with cap -->
+            <a-entity id="bowler-head" position="0 1.45 0">
+                <!-- Head -->
+                <a-sphere radius="0.12" material="color: #DEB887; roughness: 0.8" shadow="cast: true"></a-sphere>
+                <!-- Cap -->
+                <a-cylinder position="0 0.08 0" radius="0.13" height="0.08" 
+                            material="color: #1a4d8f; roughness: 0.6"></a-cylinder>
+                <!-- Cap brim -->
+                <a-cylinder position="0 0.05 0.08" radius="0.14" height="0.02" rotation="20 0 0"
+                            material="color: #1a4d8f; roughness: 0.6"></a-cylinder>
+            </a-entity>
         </a-entity>
         
-        <!-- Cricket Ball -->
-        <a-sphere 
-            id="cricket-ball"
-            position="0 1.5 -24"
-            radius="0.15"
-            color="#FF0000"
-            visible="false"
-            material="shader: flat; emissive: #FF0000; emissiveIntensity: 0.5"
-            shadow="receive: false">
-            <!-- Ball seam -->
-            <a-torus position="0 0 0" radius="0.15" radius-tubular="0.01" color="#FFFFFF" rotation="0 0 0"></a-torus>
-        </a-sphere>
+        <!-- ================================================================
+             CRICKET BALL - Photorealistic with seam and shine
+        ================================================================= -->
+        <a-entity id="cricket-ball-container" position="0 1.8 -24" visible="false">
+            <!-- Main ball (red leather) -->
+            <a-sphere 
+                id="cricket-ball"
+                radius="0.036"
+                material="color: #8B0000; 
+                         roughness: 0.4; 
+                         metalness: 0.1"
+                shadow="cast: true; receive: false">
+            </a-sphere>
+            
+            <!-- Ball seam (white stitching) - Primary seam -->
+            <a-torus id="ball-seam-1" 
+                     radius="0.036" 
+                     radius-tubular="0.003"
+                     segments-radial="6"
+                     segments-tubular="32"
+                     material="color: #ffffff; roughness: 0.3; emissive: #ffffff; emissiveIntensity: 0.2"
+                     rotation="0 0 0">
+            </a-torus>
+            
+            <!-- Secondary seam (perpendicular for realism) -->
+            <a-torus id="ball-seam-2" 
+                     radius="0.034" 
+                     radius-tubular="0.002"
+                     segments-radial="6"
+                     segments-tubular="24"
+                     material="color: #ffffff; roughness: 0.3"
+                     rotation="90 0 0"
+                     visible="true">
+            </a-torus>
+            
+            <!-- Shine patch (one side shinier for swing) -->
+            <a-sphere id="ball-shine"
+                      radius="0.037"
+                      theta-start="0"
+                      theta-length="90"
+                      phi-start="0"
+                      phi-length="180"
+                      material="color: #a00000; roughness: 0.2; metalness: 0.3; transparent: true; opacity: 0.4"
+                      rotation="0 45 0">
+            </a-sphere>
+        </a-entity>
         
-        <!-- Ball Trail -->
+        <!-- Ball Trail - Dynamic trail effect -->
         <a-entity id="ball-trail"></a-entity>
         
-        <!-- Fielders -->
+        <!-- ================================================================
+             FIELDERS - Better proportioned player models
+        ================================================================= -->
         <a-entity id="fielders">
-            <!-- Slip Fielder -->
+            <!-- Slip Fielder (crouched, ready position) -->
             <a-entity class="fielder" id="fielder-slip" position="3 0 2">
-                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
-                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+                <a-cylinder position="0 0.55 0" radius="0.15" height="0.8" 
+                            material="color: #f5f5f5; roughness: 0.7" shadow="cast: true"></a-cylinder>
+                <a-sphere position="0 1.1 0" radius="0.1" material="color: #DEB887; roughness: 0.8"></a-sphere>
+                <!-- Cap -->
+                <a-cylinder position="0 1.18 0" radius="0.11" height="0.06" 
+                            material="color: #1a4d8f; roughness: 0.6"></a-cylinder>
+                <!-- Arms (ready position) -->
+                <a-cylinder position="0.2 0.7 -0.15" radius="0.04" height="0.35" rotation="60 0 20"
+                            material="color: #DEB887; roughness: 0.8"></a-cylinder>
+                <a-cylinder position="-0.2 0.7 -0.15" radius="0.04" height="0.35" rotation="60 0 -20"
+                            material="color: #DEB887; roughness: 0.8"></a-cylinder>
             </a-entity>
             
             <!-- Point Fielder -->
-            <a-entity class="fielder" id="fielder-point" position="12 0 -5">
-                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
-                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            <a-entity class="fielder" id="fielder-point" position="15 0 -5">
+                <a-cylinder position="0 0.6 0" radius="0.15" height="0.9" 
+                            material="color: #f5f5f5; roughness: 0.7" shadow="cast: true"></a-cylinder>
+                <a-sphere position="0 1.2 0" radius="0.1" material="color: #DEB887; roughness: 0.8"></a-sphere>
+                <a-cylinder position="0 1.28 0" radius="0.11" height="0.06" 
+                            material="color: #1a4d8f; roughness: 0.6"></a-cylinder>
             </a-entity>
             
             <!-- Cover Fielder -->
-            <a-entity class="fielder" id="fielder-cover" position="15 0 -15">
-                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
-                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            <a-entity class="fielder" id="fielder-cover" position="18 0 -18">
+                <a-cylinder position="0 0.6 0" radius="0.15" height="0.9" 
+                            material="color: #f5f5f5; roughness: 0.7" shadow="cast: true"></a-cylinder>
+                <a-sphere position="0 1.2 0" radius="0.1" material="color: #DEB887; roughness: 0.8"></a-sphere>
+                <a-cylinder position="0 1.28 0" radius="0.11" height="0.06" 
+                            material="color: #1a4d8f; roughness: 0.6"></a-cylinder>
             </a-entity>
             
             <!-- Mid-off Fielder -->
-            <a-entity class="fielder" id="fielder-midoff" position="8 0 -25">
-                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
-                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            <a-entity class="fielder" id="fielder-midoff" position="12 0 -30">
+                <a-cylinder position="0 0.6 0" radius="0.15" height="0.9" 
+                            material="color: #f5f5f5; roughness: 0.7" shadow="cast: true"></a-cylinder>
+                <a-sphere position="0 1.2 0" radius="0.1" material="color: #DEB887; roughness: 0.8"></a-sphere>
+                <a-cylinder position="0 1.28 0" radius="0.11" height="0.06" 
+                            material="color: #1a4d8f; roughness: 0.6"></a-cylinder>
             </a-entity>
             
             <!-- Mid-on Fielder -->
-            <a-entity class="fielder" id="fielder-midon" position="-8 0 -25">
-                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
-                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            <a-entity class="fielder" id="fielder-midon" position="-12 0 -30">
+                <a-cylinder position="0 0.6 0" radius="0.15" height="0.9" 
+                            material="color: #f5f5f5; roughness: 0.7" shadow="cast: true"></a-cylinder>
+                <a-sphere position="0 1.2 0" radius="0.1" material="color: #DEB887; roughness: 0.8"></a-sphere>
+                <a-cylinder position="0 1.28 0" radius="0.11" height="0.06" 
+                            material="color: #1a4d8f; roughness: 0.6"></a-cylinder>
             </a-entity>
             
             <!-- Square Leg Fielder -->
-            <a-entity class="fielder" id="fielder-squareleg" position="-12 0 -5">
-                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
-                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            <a-entity class="fielder" id="fielder-squareleg" position="-15 0 -5">
+                <a-cylinder position="0 0.6 0" radius="0.15" height="0.9" 
+                            material="color: #f5f5f5; roughness: 0.7" shadow="cast: true"></a-cylinder>
+                <a-sphere position="0 1.2 0" radius="0.1" material="color: #DEB887; roughness: 0.8"></a-sphere>
+                <a-cylinder position="0 1.28 0" radius="0.11" height="0.06" 
+                            material="color: #1a4d8f; roughness: 0.6"></a-cylinder>
             </a-entity>
             
             <!-- Fine Leg Fielder -->
-            <a-entity class="fielder" id="fielder-fineleg" position="-8 0 10">
-                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
-                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            <a-entity class="fielder" id="fielder-fineleg" position="-12 0 15">
+                <a-cylinder position="0 0.6 0" radius="0.15" height="0.9" 
+                            material="color: #f5f5f5; roughness: 0.7" shadow="cast: true"></a-cylinder>
+                <a-sphere position="0 1.2 0" radius="0.1" material="color: #DEB887; roughness: 0.8"></a-sphere>
+                <a-cylinder position="0 1.28 0" radius="0.11" height="0.06" 
+                            material="color: #1a4d8f; roughness: 0.6"></a-cylinder>
             </a-entity>
             
             <!-- Third Man Fielder -->
-            <a-entity class="fielder" id="fielder-thirdman" position="8 0 10">
-                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
-                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            <a-entity class="fielder" id="fielder-thirdman" position="12 0 15">
+                <a-cylinder position="0 0.6 0" radius="0.15" height="0.9" 
+                            material="color: #f5f5f5; roughness: 0.7" shadow="cast: true"></a-cylinder>
+                <a-sphere position="0 1.2 0" radius="0.1" material="color: #DEB887; roughness: 0.8"></a-sphere>
+                <a-cylinder position="0 1.28 0" radius="0.11" height="0.06" 
+                            material="color: #1a4d8f; roughness: 0.6"></a-cylinder>
             </a-entity>
             
             <!-- Long-off Boundary -->
-            <a-entity class="fielder" id="fielder-longoff" position="20 0 -50">
-                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
-                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            <a-entity class="fielder" id="fielder-longoff" position="30 0 -55">
+                <a-cylinder position="0 0.6 0" radius="0.15" height="0.9" 
+                            material="color: #f5f5f5; roughness: 0.7" shadow="cast: true"></a-cylinder>
+                <a-sphere position="0 1.2 0" radius="0.1" material="color: #DEB887; roughness: 0.8"></a-sphere>
+                <a-cylinder position="0 1.28 0" radius="0.11" height="0.06" 
+                            material="color: #1a4d8f; roughness: 0.6"></a-cylinder>
             </a-entity>
             
             <!-- Long-on Boundary -->
-            <a-entity class="fielder" id="fielder-longon" position="-20 0 -50">
-                <a-cylinder position="0 0.7 0" radius="0.2" height="1" color="#FFFFFF"></a-cylinder>
-                <a-sphere position="0 1.4 0" radius="0.15" color="#DEB887"></a-sphere>
+            <a-entity class="fielder" id="fielder-longon" position="-30 0 -55">
+                <a-cylinder position="0 0.6 0" radius="0.15" height="0.9" 
+                            material="color: #f5f5f5; roughness: 0.7" shadow="cast: true"></a-cylinder>
+                <a-sphere position="0 1.2 0" radius="0.1" material="color: #DEB887; roughness: 0.8"></a-sphere>
+                <a-cylinder position="0 1.28 0" radius="0.11" height="0.06" 
+                            material="color: #1a4d8f; roughness: 0.6"></a-cylinder>
             </a-entity>
             
-            <!-- Wicket Keeper -->
-            <a-entity class="fielder" id="wicket-keeper" position="0 0 2">
-                <a-cylinder position="0 0.5 0" radius="0.2" height="0.8" color="#FFFFFF"></a-cylinder>
-                <a-sphere position="0 1.1 0" radius="0.15" color="#DEB887"></a-sphere>
-                <!-- Gloves -->
-                <a-sphere position="0.3 0.7 -0.2" radius="0.1" color="#8B4513"></a-sphere>
-                <a-sphere position="-0.3 0.7 -0.2" radius="0.1" color="#8B4513"></a-sphere>
+            <!-- ============================================================
+                 WICKET KEEPER - Detailed with gloves, pads, helmet
+            ============================================================= -->
+            <a-entity class="fielder" id="wicket-keeper" position="0 0 2.5">
+                <!-- Legs with pads -->
+                <a-cylinder position="0.1 0.35 0" radius="0.08" height="0.65" 
+                            material="color: #f5f5f5; roughness: 0.7" shadow="cast: true"></a-cylinder>
+                <a-cylinder position="-0.1 0.35 0" radius="0.08" height="0.65" 
+                            material="color: #f5f5f5; roughness: 0.7" shadow="cast: true"></a-cylinder>
+                <!-- Keeper pads (cream colored, larger) -->
+                <a-box position="0.1 0.35 -0.06" width="0.12" height="0.5" depth="0.08" 
+                       material="color: #f5f5dc; roughness: 0.6"></a-box>
+                <a-box position="-0.1 0.35 -0.06" width="0.12" height="0.5" depth="0.08" 
+                       material="color: #f5f5dc; roughness: 0.6"></a-box>
+                
+                <!-- Body (crouched) -->
+                <a-cylinder position="0 0.75 0" radius="0.18" height="0.45" 
+                            material="color: #f5f5f5; roughness: 0.7" shadow="cast: true"></a-cylinder>
+                
+                <!-- Head with helmet and face guard -->
+                <a-entity id="keeper-head" position="0 1.05 0">
+                    <a-sphere radius="0.1" material="color: #DEB887; roughness: 0.8"></a-sphere>
+                    <!-- Helmet -->
+                    <a-sphere position="0 0.03 0" radius="0.12" theta-length="120"
+                              material="color: #1a4d8f; roughness: 0.4; metalness: 0.3"></a-sphere>
+                    <!-- Face guard (grille) -->
+                    <a-box position="0 -0.02 -0.11" width="0.12" height="0.1" depth="0.02"
+                           material="color: #333333; metalness: 0.8; roughness: 0.3"></a-box>
+                </a-entity>
+                
+                <!-- Wicket keeping gloves (large, padded) -->
+                <a-entity id="keeper-gloves">
+                    <!-- Right glove -->
+                    <a-cylinder position="0.25 0.7 -0.2" radius="0.04" height="0.3" rotation="70 0 30"
+                                material="color: #DEB887; roughness: 0.8"></a-cylinder>
+                    <a-sphere position="0.32 0.55 -0.28" radius="0.08" 
+                              material="color: #8B4513; roughness: 0.7"></a-sphere>
+                    <!-- Glove webbing -->
+                    <a-box position="0.32 0.55 -0.35" width="0.1" height="0.12" depth="0.02"
+                           material="color: #654321; roughness: 0.8"></a-box>
+                    
+                    <!-- Left glove -->
+                    <a-cylinder position="-0.25 0.7 -0.2" radius="0.04" height="0.3" rotation="70 0 -30"
+                                material="color: #DEB887; roughness: 0.8"></a-cylinder>
+                    <a-sphere position="-0.32 0.55 -0.28" radius="0.08" 
+                              material="color: #8B4513; roughness: 0.7"></a-sphere>
+                    <a-box position="-0.32 0.55 -0.35" width="0.1" height="0.12" depth="0.02"
+                           material="color: #654321; roughness: 0.8"></a-box>
+                </a-entity>
             </a-entity>
         </a-entity>
         
-        <!-- VR Camera Rig -->
+        <!-- ================================================================
+             VR CAMERA RIG & CONTROLLERS
+             Player position with realistic cricket bat
+        ================================================================= -->
         <a-entity id="rig" position="0 0 0">
             <a-camera id="camera" position="0 1.6 0" wasd-controls-enabled="false"></a-camera>
             
-            <!-- Left Hand Controller (Menu) -->
+            <!-- Left Hand Controller (Menu/Navigation) -->
             <a-entity 
                 id="left-hand"
                 oculus-touch-controls="hand: left"
                 laser-controls="hand: left">
             </a-entity>
             
-            <!-- Right Hand Controller (Bat) -->
+            <!-- Right Hand Controller (Cricket Bat) -->
             <a-entity 
                 id="right-hand"
                 oculus-touch-controls="hand: right">
                 
-                <!-- Cricket Bat Model -->
+                <!-- ========================================================
+                     CRICKET BAT - Photorealistic willow bat with details
+                     Proper cricket bat proportions and materials
+                ======================================================== -->
                 <a-entity id="cricket-bat" rotation="-90 0 0" position="0 0 -0.1">
-                    <!-- Bat Handle -->
-                    <a-cylinder 
-                        position="0 0.15 0" 
-                        radius="0.02" 
-                        height="0.35" 
-                        color="#8B4513">
-                    </a-cylinder>
                     
-                    <!-- Bat Handle Grip -->
-                    <a-cylinder 
-                        position="0 0.05 0" 
-                        radius="0.022" 
-                        height="0.15" 
-                        color="#2F4F4F">
-                    </a-cylinder>
+                    <!-- Handle - Cane with rubber grip -->
+                    <a-entity id="bat-handle">
+                        <!-- Inner cane handle -->
+                        <a-cylinder 
+                            position="0 0.12 0" 
+                            radius="0.016" 
+                            height="0.28" 
+                            material="color: #d4a574; roughness: 0.6">
+                        </a-cylinder>
+                        
+                        <!-- Rubber grip (black with texture simulation) -->
+                        <a-cylinder 
+                            id="bat-grip"
+                            position="0 0.05 0" 
+                            radius="0.018" 
+                            height="0.15" 
+                            material="color: #1a1a1a; roughness: 0.9; metalness: 0">
+                        </a-cylinder>
+                        
+                        <!-- Grip texture rings (simulating ridged rubber) -->
+                        <a-torus position="0 0.02 0" radius="0.019" radius-tubular="0.002" rotation="90 0 0"
+                                 material="color: #333; roughness: 0.8"></a-torus>
+                        <a-torus position="0 0.04 0" radius="0.019" radius-tubular="0.002" rotation="90 0 0"
+                                 material="color: #333; roughness: 0.8"></a-torus>
+                        <a-torus position="0 0.06 0" radius="0.019" radius-tubular="0.002" rotation="90 0 0"
+                                 material="color: #333; roughness: 0.8"></a-torus>
+                        <a-torus position="0 0.08 0" radius="0.019" radius-tubular="0.002" rotation="90 0 0"
+                                 material="color: #333; roughness: 0.8"></a-torus>
+                        
+                        <!-- Handle splice (where handle meets blade) -->
+                        <a-cylinder 
+                            position="0 0.22 0" 
+                            radius="0.022" 
+                            height="0.06" 
+                            material="color: #c9a86c; roughness: 0.5">
+                        </a-cylinder>
+                    </a-entity>
                     
-                    <!-- Bat Blade -->
+                    <!-- Blade - English willow style -->
+                    <a-entity id="bat-blade-assembly" position="0 0.52 0">
+                        <!-- Main blade face (front - hitting surface) -->
+                        <a-box 
+                            id="bat-blade"
+                            position="0 0 0.012" 
+                            width="0.108" 
+                            height="0.44" 
+                            depth="0.025" 
+                            material="color: #f5e6c8; roughness: 0.7; metalness: 0"
+                            shadow="cast: true">
+                        </a-box>
+                        
+                        <!-- Blade back (spine - curved/ridged) -->
+                        <a-box 
+                            position="0 0 -0.018" 
+                            width="0.095" 
+                            height="0.44" 
+                            depth="0.02" 
+                            material="color: #e8d4b0; roughness: 0.65">
+                        </a-box>
+                        
+                        <!-- Spine ridge (center ridge on back) -->
+                        <a-box 
+                            position="0 0 -0.032" 
+                            width="0.03" 
+                            height="0.38" 
+                            depth="0.015" 
+                            material="color: #e0c8a0; roughness: 0.6">
+                        </a-box>
+                        
+                        <!-- Bat edges (thicker sides) -->
+                        <a-box 
+                            position="-0.055 0 0" 
+                            width="0.012" 
+                            height="0.44" 
+                            depth="0.045" 
+                            material="color: #e8d4b0; roughness: 0.65">
+                        </a-box>
+                        <a-box 
+                            position="0.055 0 0" 
+                            width="0.012" 
+                            height="0.44" 
+                            depth="0.045" 
+                            material="color: #e8d4b0; roughness: 0.65">
+                        </a-box>
+                        
+                        <!-- Sweet spot area (slightly darker from ball marks) -->
+                        <a-box 
+                            id="sweet-spot"
+                            position="0 -0.05 0.026" 
+                            width="0.07" 
+                            height="0.12" 
+                            depth="0.002" 
+                            material="color: #d4c4a8; roughness: 0.8; transparent: true; opacity: 0.6">
+                        </a-box>
+                        
+                        <!-- Sponsor sticker area (simplified logo) -->
+                        <a-plane 
+                            position="0 0.1 0.026" 
+                            width="0.08" 
+                            height="0.06" 
+                            material="color: #1a4d8f; roughness: 0.3">
+                        </a-plane>
+                        <a-text 
+                            position="0 0.1 0.028" 
+                            value="PRO" 
+                            align="center" 
+                            color="#ffffff" 
+                            width="0.15">
+                        </a-text>
+                        
+                        <!-- Edge scuff marks (signs of use) -->
+                        <a-box position="-0.052 0.05 0.01" width="0.008" height="0.03" depth="0.01" 
+                               material="color: #c0b090; roughness: 0.9"></a-box>
+                        <a-box position="0.052 -0.08 0.01" width="0.008" height="0.025" depth="0.01" 
+                               material="color: #c0b090; roughness: 0.9"></a-box>
+                    </a-entity>
+                    
+                    <!-- Toe - bottom of bat with toe guard -->
+                    <a-entity id="bat-toe" position="0 0.76 0">
+                        <!-- Rounded toe shape -->
+                        <a-box 
+                            position="0 0 0" 
+                            width="0.108" 
+                            height="0.03" 
+                            depth="0.04" 
+                            material="color: #e8d4b0; roughness: 0.65">
+                        </a-box>
+                        
+                        <!-- Toe guard (rubber protection - darker) -->
+                        <a-box 
+                            position="0 0.005 0.015" 
+                            width="0.11" 
+                            height="0.025" 
+                            depth="0.02" 
+                            material="color: #2a2a2a; roughness: 0.85">
+                        </a-box>
+                    </a-entity>
+                    
+                    <!-- Visual sweet spot guide (shown during practice) -->
                     <a-box 
-                        id="bat-blade"
-                        position="0 0.55 0" 
-                        width="0.11" 
-                        height="0.5" 
-                        depth="0.04" 
-                        color="#F5DEB3">
-                    </a-box>
-                    
-                    <!-- Bat Edge (Left) -->
-                    <a-box 
-                        position="-0.055 0.55 0" 
-                        width="0.01" 
-                        height="0.5" 
-                        depth="0.05" 
-                        color="#DEB887">
-                    </a-box>
-                    
-                    <!-- Bat Edge (Right) -->
-                    <a-box 
-                        position="0.055 0.55 0" 
-                        width="0.01" 
-                        height="0.5" 
-                        depth="0.05" 
-                        color="#DEB887">
-                    </a-box>
-                    
-                    <!-- Bat Toe -->
-                    <a-box 
-                        position="0 0.82 0" 
-                        width="0.11" 
-                        height="0.04" 
-                        depth="0.04" 
-                        color="#DEB887"
-                        rotation="0 0 0">
-                    </a-box>
-                    
-                    <!-- Sweet Spot Marker (Visual Guide) -->
-                    <a-box 
-                        id="sweet-spot"
-                        position="0 0.5 0.025" 
+                        id="sweet-spot-guide"
+                        position="0 0.47 0.04" 
                         width="0.06" 
-                        height="0.15" 
+                        height="0.1" 
                         depth="0.001" 
-                        color="#FFD700"
-                        opacity="0.3">
+                        material="color: #00ff00; emissive: #00ff00; emissiveIntensity: 0.3; transparent: true; opacity: 0.2"
+                        visible="false">
                     </a-box>
                 </a-entity>
             </a-entity>
         </a-entity>
         
-        <!-- In-VR Score Display -->
-        <a-entity id="vr-hud" position="0 2.5 -3" look-at="[camera]">
-            <a-plane 
-                position="0 0 0" 
-                width="2" 
-                height="0.8" 
-                color="#000000" 
-                opacity="0.7"
-                visible="false"
-                id="vr-scoreboard">
-            </a-plane>
-            <a-text 
-                id="vr-score-text"
-                value="0/0"
-                align="center"
-                position="0 0.15 0.01"
-                scale="1.5 1.5 1.5"
-                color="#FFFFFF"
-                visible="false">
-            </a-text>
-            <a-text 
-                id="vr-balls-text"
-                value="Balls: 0"
-                align="center"
-                position="0 -0.1 0.01"
-                scale="0.7 0.7 0.7"
-                color="#CCCCCC"
-                visible="false">
-            </a-text>
-            <a-text 
-                id="vr-shot-text"
-                value=""
-                align="center"
-                position="0 -0.25 0.01"
-                scale="0.5 0.5 0.5"
-                color="#FFD700"
-                visible="false">
-            </a-text>
+        <!-- ================================================================
+             IN-VR HUD - Floating scoreboard and info display
+        ================================================================= -->
+        <a-entity id="vr-hud" position="0 2.8 -4" look-at="[camera]">
+            <!-- Scoreboard background panel -->
+            <a-entity id="vr-scoreboard-container">
+                <a-plane 
+                    id="vr-scoreboard"
+                    position="0 0 0" 
+                    width="2.4" 
+                    height="1" 
+                    material="color: #0a0a0a; opacity: 0.85; transparent: true"
+                    visible="false">
+                </a-plane>
+                
+                <!-- Team color accent bar -->
+                <a-plane
+                    position="0 0.45 0.01"
+                    width="2.4"
+                    height="0.08"
+                    material="color: #1a4d8f; shader: flat"
+                    visible="false"
+                    class="vr-hud-element">
+                </a-plane>
+                
+                <!-- Score display -->
+                <a-text 
+                    id="vr-score-text"
+                    value="0/0"
+                    align="center"
+                    position="0 0.2 0.02"
+                    scale="1.8 1.8 1.8"
+                    color="#ffffff"
+                    font="monoid"
+                    visible="false">
+                </a-text>
+                
+                <!-- Balls/Overs info -->
+                <a-text 
+                    id="vr-balls-text"
+                    value="Balls: 0"
+                    align="center"
+                    position="0 -0.05 0.02"
+                    scale="0.6 0.6 0.6"
+                    color="#cccccc"
+                    visible="false">
+                </a-text>
+                
+                <!-- Strike rate -->
+                <a-text 
+                    id="vr-sr-text"
+                    value="SR: 0.00"
+                    align="center"
+                    position="0 -0.2 0.02"
+                    scale="0.5 0.5 0.5"
+                    color="#aaaaaa"
+                    visible="false">
+                </a-text>
+                
+                <!-- Last shot type -->
+                <a-text 
+                    id="vr-shot-text"
+                    value=""
+                    align="center"
+                    position="0 -0.35 0.02"
+                    scale="0.5 0.5 0.5"
+                    color="#ffd700"
+                    visible="false">
+                </a-text>
+            </a-entity>
         </a-entity>
         
-        <!-- Hit Effect Particles -->
+        <!-- ================================================================
+             PARTICLE EFFECTS CONTAINERS
+        ================================================================= -->
+        
+        <!-- Hit effect particles (bat contact) -->
         <a-entity id="hit-particles" position="0 1 0" visible="false">
-            <a-sphere radius="0.05" color="#FFD700" opacity="0.8"></a-sphere>
+            <a-sphere class="hit-particle" radius="0.03" material="color: #FFD700; emissive: #FFD700; emissiveIntensity: 0.8; shader: flat; opacity: 0.9; transparent: true"></a-sphere>
+            <a-sphere class="hit-particle" radius="0.02" material="color: #FFA500; emissive: #FFA500; emissiveIntensity: 0.6; shader: flat; opacity: 0.8; transparent: true" position="0.05 0.02 0"></a-sphere>
+            <a-sphere class="hit-particle" radius="0.02" material="color: #FF6600; emissive: #FF6600; emissiveIntensity: 0.6; shader: flat; opacity: 0.8; transparent: true" position="-0.05 0.02 0"></a-sphere>
+            <a-sphere class="hit-particle" radius="0.015" material="color: #FFFF00; emissive: #FFFF00; emissiveIntensity: 0.7; shader: flat; opacity: 0.7; transparent: true" position="0 0.05 0.03"></a-sphere>
+        </a-entity>
+        
+        <!-- Dust particles (ball bounce on pitch) -->
+        <a-entity id="dust-particles" position="0 0.05 -10" visible="false">
+            <a-sphere class="dust-particle" radius="0.05" material="color: #c4a35a; opacity: 0.4; transparent: true; shader: flat"></a-sphere>
+            <a-sphere class="dust-particle" radius="0.04" material="color: #b8956e; opacity: 0.3; transparent: true; shader: flat" position="0.08 0.02 0"></a-sphere>
+            <a-sphere class="dust-particle" radius="0.035" material="color: #d4b896; opacity: 0.35; transparent: true; shader: flat" position="-0.07 0.03 0.02"></a-sphere>
+            <a-sphere class="dust-particle" radius="0.03" material="color: #c9a97c; opacity: 0.25; transparent: true; shader: flat" position="0.03 0.04 -0.05"></a-sphere>
+        </a-entity>
+        
+        <!-- Stump LED glow effect container -->
+        <a-entity id="stump-glow-effect" position="0 0.4 0.5" visible="false">
+            <a-sphere radius="0.3" material="color: #ff0000; emissive: #ff0000; emissiveIntensity: 1; transparent: true; opacity: 0.3; shader: flat"></a-sphere>
         </a-entity>
         
     </a-scene>
@@ -1606,10 +2265,14 @@ Enjoy photorealistic VR cricket! 🏏
                     
                     this.bounceCount++;
                     
-                    // Play bounce sound on first pitch bounce
+                    // Play bounce sound on first pitch bounce and show dust effect
                     if (!GameState.ballHasBouncedOnPitch && ball.z > -20 && ball.z < 5) {
                         GameState.ballHasBouncedOnPitch = true;
                         AudioSystem.playBounce();
+                        
+                        // Show dust particles at bounce location
+                        this.showDustParticles(ball.x, 0.02, ball.z);
+                        
                         console.log(`🏏 Ball bounced at z=${ball.z.toFixed(2)}, new vy=${vel.y.toFixed(2)}`);
                     }
                     
@@ -1700,8 +2363,9 @@ Enjoy photorealistic VR cricket! 🏏
                     showShotFeedback('BOWLED!', 'out');
                     AudioSystem.playStumpsHit();
                     
-                    // Animate bails
+                    // Animate bails and show LED glow effect
                     this.animateBails();
+                    this.showStumpGlow();
                     
                     this.endDelivery();
                 }
@@ -1878,6 +2542,83 @@ Enjoy photorealistic VR cricket! 🏏
                                 }
                             }, 1500);
                         }
+                    }, 1500);
+                }
+            },
+            
+            /**
+             * Show dust particle effect when ball bounces on pitch
+             * Creates realistic dust cloud animation
+             */
+            showDustParticles: function(x, y, z) {
+                const dustContainer = document.getElementById('dust-particles');
+                if (!dustContainer) return;
+                
+                // Position at bounce location
+                dustContainer.setAttribute('position', `${x} ${y} ${z}`);
+                dustContainer.setAttribute('visible', 'true');
+                
+                // Get all dust particle elements
+                const dustEls = dustContainer.querySelectorAll('.dust-particle');
+                
+                // Animate each particle
+                dustEls.forEach((d, i) => {
+                    const angle = (i / dustEls.length) * Math.PI * 2 + Math.random() * 0.5;
+                    const distance = 0.1 + Math.random() * 0.15;
+                    
+                    // Random initial position near center
+                    const startX = (Math.random() - 0.5) * 0.05;
+                    const startZ = (Math.random() - 0.5) * 0.05;
+                    
+                    d.setAttribute('position', `${startX} 0 ${startZ}`);
+                    d.setAttribute('scale', '1 1 1');
+                    d.setAttribute('material', 'color: #c4a35a; opacity: 0.5; transparent: true; shader: flat');
+                    
+                    // Animate outward and upward
+                    const endX = Math.cos(angle) * distance;
+                    const endY = 0.15 + Math.random() * 0.1;
+                    const endZ = Math.sin(angle) * distance;
+                    
+                    d.setAttribute('animation', `property: position; to: ${endX} ${endY} ${endZ}; dur: 400; easing: easeOutQuad`);
+                    d.setAttribute('animation__fade', 'property: material.opacity; to: 0; dur: 400; easing: easeInQuad');
+                    d.setAttribute('animation__scale', 'property: scale; to: 2.5 2.5 2.5; dur: 400; easing: easeOutQuad');
+                });
+                
+                // Hide and reset after animation
+                setTimeout(() => {
+                    dustContainer.setAttribute('visible', 'false');
+                    dustEls.forEach(d => {
+                        d.removeAttribute('animation');
+                        d.removeAttribute('animation__fade');
+                        d.removeAttribute('animation__scale');
+                        d.setAttribute('scale', '1 1 1');
+                    });
+                }, 450);
+            },
+            
+            /**
+             * Show stump LED glow effect when bowled
+             */
+            showStumpGlow: function() {
+                const glowEffect = document.getElementById('stump-glow-effect');
+                const ledRing = document.getElementById('stump-led-ring');
+                
+                if (glowEffect) {
+                    glowEffect.setAttribute('visible', 'true');
+                    glowEffect.setAttribute('animation', 'property: scale; from: 1 1 1; to: 3 3 3; dur: 500; easing: easeOutQuad');
+                    glowEffect.setAttribute('animation__fade', 'property: material.opacity; from: 0.5; to: 0; dur: 500; easing: easeInQuad');
+                    
+                    setTimeout(() => {
+                        glowEffect.setAttribute('visible', 'false');
+                        glowEffect.removeAttribute('animation');
+                        glowEffect.removeAttribute('animation__fade');
+                    }, 550);
+                }
+                
+                if (ledRing) {
+                    ledRing.setAttribute('material', 'color: #ff0000; emissive: #ff0000; emissiveIntensity: 1');
+                    setTimeout(() => {
+                        ledRing.setAttribute('material', 'color: #ff0000; emissive: #ff0000; emissiveIntensity: 0.1');
                     }, 1500);
                 }
             }
@@ -2156,25 +2897,65 @@ Enjoy photorealistic VR cricket! 🏏
                 else if (quality === 'good') color = '#FFFF00';
                 else if (quality === 'edge') color = '#FF0000';
                 
-                // Flash bat
+                // Flash bat with glow effect
                 if (batBlade) {
-                    batBlade.setAttribute('color', color);
+                    batBlade.setAttribute('material', `color: ${color}; emissive: ${color}; emissiveIntensity: 0.3; roughness: 0.7`);
                     setTimeout(() => {
-                        batBlade.setAttribute('color', '#F5DEB3');
+                        batBlade.setAttribute('material', 'color: #f5e6c8; emissive: #000000; emissiveIntensity: 0; roughness: 0.7; metalness: 0');
                     }, 200);
                 }
                 
-                // Show hit particles
+                // Show enhanced hit particles with animation
+                this.showHitParticles(GameState.ballPosition, quality, color);
+            },
+            
+            /**
+             * Enhanced hit particle effect with animated sparks
+             */
+            showHitParticles: function(position, quality, color) {
                 const particles = document.getElementById('hit-particles');
-                if (particles) {
-                    particles.setAttribute('position', `${GameState.ballPosition.x} ${GameState.ballPosition.y} ${GameState.ballPosition.z}`);
-                    particles.setAttribute('visible', 'true');
-                    particles.querySelector('a-sphere').setAttribute('color', color);
+                if (!particles) return;
+                
+                // Position at hit location
+                particles.setAttribute('position', `${position.x} ${position.y} ${position.z}`);
+                particles.setAttribute('visible', 'true');
+                
+                // Get all particle elements
+                const particleEls = particles.querySelectorAll('.hit-particle');
+                
+                // Animate each particle with different directions
+                particleEls.forEach((p, i) => {
+                    const angle = (i / particleEls.length) * Math.PI * 2;
+                    const speed = quality === 'perfect' ? 0.3 : quality === 'good' ? 0.2 : 0.1;
                     
-                    setTimeout(() => {
-                        particles.setAttribute('visible', 'false');
-                    }, 300);
-                }
+                    // Random initial offset
+                    const ox = Math.cos(angle) * 0.05;
+                    const oy = Math.random() * 0.05;
+                    const oz = Math.sin(angle) * 0.05;
+                    
+                    p.setAttribute('position', `${ox} ${oy} ${oz}`);
+                    p.setAttribute('material', `color: ${color}; emissive: ${color}; emissiveIntensity: 0.8; shader: flat; opacity: 0.9; transparent: true`);
+                    
+                    // Animate outward
+                    const endX = Math.cos(angle) * speed;
+                    const endY = 0.1 + Math.random() * 0.1;
+                    const endZ = Math.sin(angle) * speed;
+                    
+                    p.setAttribute('animation', `property: position; to: ${endX} ${endY} ${endZ}; dur: 300; easing: easeOutQuad`);
+                    p.setAttribute('animation__fade', 'property: material.opacity; to: 0; dur: 300; easing: linear');
+                    p.setAttribute('animation__scale', 'property: scale; to: 2 2 2; dur: 300; easing: easeOutQuad');
+                });
+                
+                // Hide after animation
+                setTimeout(() => {
+                    particles.setAttribute('visible', 'false');
+                    particleEls.forEach(p => {
+                        p.removeAttribute('animation');
+                        p.removeAttribute('animation__fade');
+                        p.removeAttribute('animation__scale');
+                        p.setAttribute('scale', '1 1 1');
+                    });
+                }, 350);
             }
         };
         
@@ -2186,6 +2967,28 @@ Enjoy photorealistic VR cricket! 🏏
             const feedback = document.getElementById('shot-feedback');
             feedback.textContent = text;
             feedback.className = `show ${type}`;
+            
+            // Also update VR HUD shot text
+            const vrShotText = document.getElementById('vr-shot-text');
+            if (vrShotText) {
+                let color = '#ffffff';
+                if (type === 'six') color = '#ff00ff';
+                else if (type === 'four') color = '#00ff00';
+                else if (type === 'out') color = '#ff0000';
+                else if (type === 'runs') color = '#ffff00';
+                
+                vrShotText.setAttribute('value', text);
+                vrShotText.setAttribute('color', color);
+                
+                // Animate the text
+                vrShotText.setAttribute('animation', 'property: scale; from: 1.5 1.5 1.5; to: 0.5 0.5 0.5; dur: 1500; easing: easeOutQuad');
+                
+                setTimeout(() => {
+                    vrShotText.setAttribute('value', '');
+                    vrShotText.removeAttribute('animation');
+                    vrShotText.setAttribute('scale', '0.5 0.5 0.5');
+                }, 1500);
+            }
             
             setTimeout(() => {
                 feedback.className = '';
@@ -2228,32 +3031,34 @@ Enjoy photorealistic VR cricket! 🏏
             document.getElementById('hud-sixes').textContent = GameState.sixes;
             document.getElementById('hud-sr').textContent = GameState.getStrikeRate();
             
-            // Update VR HUD
+            // Update VR HUD with all elements
             const vrScoreText = document.getElementById('vr-score-text');
             const vrBallsText = document.getElementById('vr-balls-text');
+            const vrSrText = document.getElementById('vr-sr-text');
             
             if (vrScoreText) {
                 vrScoreText.setAttribute('value', `${GameState.runs}/${GameState.wickets}`);
             }
             if (vrBallsText) {
-                vrBallsText.setAttribute('value', `Balls: ${GameState.ballsFaced}`);
+                const overs = Math.floor(GameState.ballsFaced / 6);
+                const balls = GameState.ballsFaced % 6;
+                vrBallsText.setAttribute('value', `Overs: ${overs}.${balls}  (${GameState.ballsFaced} balls)`);
+            }
+            if (vrSrText) {
+                vrSrText.setAttribute('value', `SR: ${GameState.getStrikeRate()} | 4s: ${GameState.fours} | 6s: ${GameState.sixes}`);
             }
         }
-        
+
         function showVRHUD(show) {
-            const elements = ['vr-scoreboard', 'vr-score-text', 'vr-balls-text', 'vr-shot-text'];
+            const elements = ['vr-scoreboard', 'vr-score-text', 'vr-balls-text', 'vr-shot-text', 'vr-sr-text'];
             elements.forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.setAttribute('visible', show);
             });
-        }
-        
-        function hideBall() {
-            const ball = document.getElementById('cricket-ball');
-            if (ball) {
-                ball.setAttribute('visible', 'false');
-                ball.setAttribute('position', '0 1.5 -24');
-            }
+            
+            // Also show/hide accent bar
+            const accentBar = document.querySelector('.vr-hud-element');
+            if (accentBar) accentBar.setAttribute('visible', show);
             
             // Clear trail
             const trailContainer = document.getElementById('ball-trail');
@@ -2613,11 +3418,18 @@ Enjoy photorealistic VR cricket! 🏏
             requestAnimationFrame(gameLoop);
         });
         
-        // A-Frame scene initialization
+        // ========================================================================
+        // VR MODE STATE TRACKING & SCENE INITIALIZATION
+        // ========================================================================
+        
+        // Track VR mode to prevent auto-pause issues
+        let isVRMode = false;
+        let vrTransitioning = false;
+        
         const scene = document.querySelector('a-scene');
         if (scene) {
             scene.addEventListener('loaded', function() {
-                console.log('VR Cricket Scene Loaded!');
+                console.log('🎮 VR Cricket Scene Loaded!');
                 
                 // Set up controller tracking
                 const rightHand = document.getElementById('right-hand');
@@ -2625,17 +3437,18 @@ Enjoy photorealistic VR cricket! 🏏
                 if (rightHand) {
                     // Track controller movement
                     rightHand.addEventListener('controllerconnected', function() {
-                        console.log('Right controller connected');
+                        console.log('✅ Right controller connected');
                     });
                     
-                    // Grip button for pause
+                    // Grip button for pause (MANUAL PAUSE ONLY)
                     rightHand.addEventListener('gripdown', function() {
                         if (GameState.isPlaying && !GameState.isPaused) {
+                            console.log('⏸ Manual pause triggered by grip button');
                             pauseGame();
                         }
                     });
                     
-                    // Track bat position
+                    // Track bat position continuously
                     setInterval(function() {
                         if (rightHand.object3D) {
                             const pos = rightHand.object3D.position;
@@ -2662,21 +3475,125 @@ Enjoy photorealistic VR cricket! 🏏
                         const rig = document.getElementById('rig');
                         if (rig) {
                             rig.setAttribute('position', '0 0 0');
+                            console.log('🔄 Player position reset');
                         }
                     });
                 }
             });
             
-            // VR mode events
+            // ================================================================
+            // VR MODE ENTER - CRITICAL FIX FOR AUTO-PAUSE
+            // ================================================================
             scene.addEventListener('enter-vr', function() {
-                console.log('Entered VR mode');
+                console.log('🥽 ENTERING VR MODE');
+                
+                // Set VR mode flag
+                isVRMode = true;
+                vrTransitioning = true;
+                
+                // FORCE RESUME if game was auto-paused during transition
+                if (GameState.isPlaying && GameState.isPaused) {
+                    console.log('⚠️ Auto-pause detected, forcing resume...');
+                    GameState.isPaused = false;
+                }
+                
+                // Show VR HUD
                 showVRHUD(true);
+                
+                // Clear transition flag after delay
+                setTimeout(() => {
+                    vrTransitioning = false;
+                    console.log('✅ VR transition complete, game active');
+                }, 200);
             });
             
+            // ================================================================
+            // VR MODE EXIT
+            // ================================================================
             scene.addEventListener('exit-vr', function() {
-                console.log('Exited VR mode');
+                console.log('🖥️ EXITING VR MODE');
+                
+                // Clear VR mode flag
+                isVRMode = false;
+                vrTransitioning = false;
+                
+                // Hide VR HUD
                 showVRHUD(false);
+                
+                console.log('✅ Returned to desktop mode');
             });
+        }
+        
+        // ====================================================================
+        // BROWSER VISIBILITY CHANGE HANDLER
+        // FIX: Don't pause when in VR mode (headset on/off triggers this)
+        // ====================================================================
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) {
+                console.log('👁️ Page visibility: HIDDEN');
+                
+                // Only pause if NOT in VR mode
+                if (!isVRMode && GameState.isPlaying && !GameState.isPaused) {
+                    console.log('⏸ Pausing game (page hidden, not in VR)');
+                    pauseGame();
+                } else if (isVRMode) {
+                    console.log('🥽 In VR mode - ignoring visibility change');
+                    // Force resume if accidentally paused
+                    GameState.isPaused = false;
+                }
+            } else {
+                console.log('👁️ Page visibility: VISIBLE');
+                
+                // Don't auto-resume, user must manually resume
+                // This prevents unwanted resumption
+            }
+        });
+        
+        // ====================================================================
+        // WINDOW BLUR EVENT HANDLER
+        // FIX: Don't pause when entering VR (window loses focus)
+        // ====================================================================
+        window.addEventListener('blur', function() {
+            console.log('🔲 Window blur detected');
+            
+            // If in VR mode, don't pause
+            if (isVRMode && GameState.isPlaying) {
+                console.log('🥽 In VR mode - preventing auto-pause from blur');
+                
+                // Add small delay and force resume if paused
+                setTimeout(() => {
+                    if (GameState.isPaused && !vrTransitioning) {
+                        console.log('⚠️ Auto-pause detected during VR, forcing resume');
+                        GameState.isPaused = false;
+                    }
+                }, 100);
+            } else if (!isVRMode && GameState.isPlaying && !GameState.isPaused) {
+                // Only pause on blur when NOT in VR mode
+                console.log('⏸ Pausing game (window blur, not in VR)');
+                pauseGame();
+            }
+        });
+        
+        // ====================================================================
+        // WINDOW FOCUS EVENT HANDLER
+        // ====================================================================
+        window.addEventListener('focus', function() {
+            console.log('🔳 Window focus regained');
+            
+            // Don't auto-resume, let user control this
+            // This prevents unwanted behavior
+        });
+        
+        // ====================================================================
+        // ADDITIONAL VR DEBUGGING
+        // ====================================================================
+        // Log VR state periodically for debugging
+        if (CONFIG.debugMode) {
+            setInterval(() => {
+                if (isVRMode) {
+                    console.log(`🥽 VR Mode Active | Paused: ${GameState.isPaused} | Playing: ${GameState.isPlaying}`);
+                }
+            }, 5000);
         }
         
         // Mouse/Touch controls for non-VR testing
